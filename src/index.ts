@@ -54,18 +54,21 @@ export class GuardError extends Error {
     this.name = 'GuardError';
   }
 }
+
 export class GuardBlockedError extends GuardError {
   constructor(d: GuardDecision) {
     super(`[AnterisLab] action BLOCKED by policy "${d.policy ?? 'n/a'}": ${d.reason}`, d);
     this.name = 'GuardBlockedError';
   }
 }
+
 export class GuardPausedError extends GuardError {
   constructor(d: GuardDecision) {
     super(`[AnterisLab] action PAUSED for human review: ${d.reason}`, d);
     this.name = 'GuardPausedError';
   }
 }
+
 export class GuardUnavailableError extends GuardError {
   constructor(message: string) {
     super(`[AnterisLab] guard unreachable: ${message}`);
@@ -176,8 +179,10 @@ export class Guard {
     return new Proxy(agentObj, {
       get(target, prop, receiver) {
         if (prop === method) return wrapped;
-        const value = Reflect.get(target, prop, receiver);
-        return typeof value === 'function' ? value.bind(target) : value;
+        const value: unknown = Reflect.get(target, prop, receiver);
+        return typeof value === 'function'
+          ? (value as (...args: unknown[]) => unknown).bind(target)
+          : value;
       },
     }) as T;
   }
