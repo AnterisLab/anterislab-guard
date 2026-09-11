@@ -1,0 +1,28 @@
+{
+  "name": "@anterislab/guard",
+  "version": "0.1.0",
+  "description": "Real-time policy guard for autonomous agents. One line to wrap your agent: every action is evaluated against your plain-language policies before it executes.",
+  "keywords": ["ai-agents", "guardrails", "policy-engine", "llm-safety", "autonomous-agents", "eu-ai-act", "audit-trail"],
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "engines": { "node": ">=18" },
+  "repository": { "type": "git", "url": "git+https://github.com/AnterisLab/anterislab-guard.git" },
+  "homepage": "https://www.anterislab.com",
+  "author": "AnterisLab <hello@anterislab.com>"
+}
