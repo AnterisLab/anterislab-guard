@@ -76,6 +76,22 @@ export class GuardUnavailableError extends GuardError {
   }
 }
 
+/** Thrown when the monthly decision quota of the plan is exhausted (HTTP 402). Never retried, never fail-open. */
+export class GuardQuotaError extends GuardError {
+  public readonly plan?: string;
+  public readonly limit?: number;
+  public readonly used?: number;
+  constructor(info: { plan?: string; limit?: number; used?: number }) {
+    super(
+      `[AnterisLab] monthly decision quota exceeded (${info.used ?? '?'}/${info.limit ?? '?'} on ${info.plan ?? 'unknown'} plan) — upgrade in your dashboard`,
+    );
+    this.name = 'GuardQuotaError';
+    this.plan = info.plan;
+    this.limit = info.limit;
+    this.used = info.used;
+  }
+}
+
 const DEFAULT_BASE = 'https://www.anterislab.com';
 
 export class Guard {
@@ -118,12 +134,21 @@ export class Guard {
         });
         clearTimeout(timer);
         if (res.status === 401) throw new GuardError('Invalid or revoked API key');
+        if (res.status === 402) {
+          const body = (await res.json().catch(() => ({}))) as {
+            plan?: string;
+            limit?: number;
+            used?: number;
+          };
+          throw new GuardQuotaError(body);
+        }
         if (!res.ok) throw new GuardError(`evaluate endpoint returned HTTP ${res.status}`);
         const decision = (await res.json()) as GuardDecision;
         this.onDecision?.(decision, action);
         return decision;
       } catch (err) {
         lastErr = err;
+        if (err instanceof GuardQuotaError) throw err;
         if (err instanceof GuardError && err.message.includes('API key')) throw err;
       }
     }
