@@ -1,6 +1,6 @@
 {
   "name": "@anterislab/guard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Real-time policy guard for autonomous agents. One line to wrap your agent: every action is evaluated against your plain-language policies before it executes.",
   "keywords": ["ai-agents", "guardrails", "policy-engine", "llm-safety", "autonomous-agents", "eu-ai-act", "audit-trail"],
   "license": "MIT",
