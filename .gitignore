@@ -2,3 +2,4 @@ node_modules
 dist
 .env
 anterislab-guard.git.bak/
+.release-tmp/
