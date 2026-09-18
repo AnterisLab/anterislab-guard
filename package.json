@@ -1,14 +1,14 @@
 {
   "name": "@anterislab/guard",
-  "version": "0.1.1",
-  "description": "Real-time policy guard for autonomous agents. One line to wrap your agent: every action is evaluated against your plain-language policies before it executes.",
+  "version": "0.2.1",
+  "description": "Real-time policy guard for autonomous agents: every action is evaluated against your plain-language policies before it executes. Fail-closed by construction.",
   "keywords": [
     "ai-agents",
     "guardrails",
     "policy-engine",
     "llm-safety",
     "autonomous-agents",
-    "eu-ai-act",
+    "kill-switch",
     "audit-trail"
   ],
   "license": "MIT",
@@ -19,30 +19,42 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
-  "scripts": {
-    "build": "tsc",
-    "prepublishOnly": "npm run build"
-  },
-  "devDependencies": {
-    "typescript": "^5.4.0"
-  },
+  "sideEffects": false,
   "engines": {
     "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "test:unit": "node --test test/*.test.mjs",
+    "check:artifact": "node scripts/check-artifact.mjs",
+    "prepack": "npm run build && npm run check:artifact",
+    "prepublishOnly": "npm run build && npm run check:artifact"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/AnterisLab/anterislab-guard.git"
   },
+  "bugs": {
+    "url": "https://github.com/AnterisLab/anterislab-guard/issues"
+  },
   "homepage": "https://www.anterislab.com",
   "author": "AnterisLab <hello@anterislab.com>",
-  "dependencies": {
-    "@upstash/ratelimit": "^2.0.8",
-    "@upstash/redis": "^1.38.4"
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }
