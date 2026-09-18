@@ -22,6 +22,7 @@
  */
 
 import { canonicalize } from '../shared/canonical-json.js';
+import { stripTrailingSlashes } from '../shared/url.js';
 import { b64uToBytes, bytesToB64u, utf8Encode } from '../shared/base64url.js';
 import {
   KILL_SWITCH_DEFAULT_AUDIENCE,
@@ -165,7 +166,7 @@ export class KillSwitchManager {
 
     this.tenant = options.tenant;
     this.agent = options.agent;
-    this.baseUrl = options.baseUrl.replace(/\/+$/, '');
+    this.baseUrl = stripTrailingSlashes(options.baseUrl);
     this.apiKey = options.apiKey;
     this.audience = options.audience ?? KILL_SWITCH_DEFAULT_AUDIENCE;
     if (options.issuers !== undefined) this.issuers = options.issuers;

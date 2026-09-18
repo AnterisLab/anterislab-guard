@@ -1,6 +1,6 @@
 {
   "name": "@anterislab/guard",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Real-time policy guard for autonomous agents: every action is evaluated against your plain-language policies before it executes. Fail-closed by construction.",
   "keywords": [
     "ai-agents",

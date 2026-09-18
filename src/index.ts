@@ -33,6 +33,7 @@ import {
 import { KillSwitchManager, type KillSwitchManagerOptions, type KillSwitchStatus } from './killswitch/client.js';
 import { Transport } from './transport.js';
 import { isAuthorizing, parseVerdict, type ParsedDecision } from './verdict.js';
+import { stripTrailingSlashes } from './shared/url.js';
 
 export const SDK_VERSION = '0.2.0';
 
@@ -169,7 +170,7 @@ export class Guard {
 
     this.options = {
       apiKey: options.apiKey,
-      baseUrl: baseUrl.replace(/\/+$/, ''),
+      baseUrl: stripTrailingSlashes(baseUrl),
       allowedHosts,
       timeoutMs: options.timeoutMs ?? 5000,
       retries: options.retries ?? 1,
