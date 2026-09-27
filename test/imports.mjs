@@ -1,6 +1,6 @@
 /**
- * Riesportazioni dei simboli pubblici del pacchetto, cosi' i test verificano l'API
- * *pubblicata* (dist/) e non i sorgenti.
+ * Re-exports of the package's public symbols, so tests exercise the *published* API (dist/)
+ * rather than the sources.
  */
 export {
   Guard,
