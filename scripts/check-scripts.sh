@@ -1,27 +1,28 @@
+
 #!/usr/bin/env bash
-# Controllo di sintassi su TUTTI gli script di shell del kit.
+# Syntax check on ALL shell scripts in the kit.
 #
-# Perche' esiste: la 0.2.0 del kit e' stata consegnata con `setup-termux.sh` e
-# `release-sdk.sh` sintatticamente INV ALIDI, e non ce ne siamo accorti perche' nessun
-# controllo automatico analizzava gli script di shell. `npm test` non li tocca: i test
-# riguardano il codice TypeScript, non gli script che servono ad avviarlo.
+# Why this exists: kit 0.2.0 shipped with `setup-termux.sh` and `release-sdk.sh`
+# syntactically INVALID, and we did not notice because no automated check inspected the
+# shell scripts. `npm test` does not touch them: the tests cover the TypeScript code, not
+# the scripts that start it.
 #
-# L'errore che ne derivava era particolarmente insidioso:
+# The resulting error was particularly insidious:
 #   scripts/setup-termux.sh: line 28: syntax error near unexpected token `('
-# indicava la riga 28, ma la causa vera era alla riga 17: un apostrofo "escapato"
-# con la barra rovesciata dentro apici singoli.
+# pointed at line 28, but the real cause was at line 17: an apostrophe "escaped" with a
+# backslash inside single quotes.
 #
-#   fail 'Questo script e\' pensato per Termux.'
-#                       ^^ la barra rovesciata NON e' un escape in bash
+#   fail 'This script e\' designed for Termux.'
+#                       ^^ the backslash is NOT an escape in bash
 #
-# Bash chiude la stringa al primo apice singolo. Tutto il resto della riga diventa
-# codice, e ogni riga successiva viene interpretata a partire da uno stato di
-# quotatura sbagliato: l'errore viene segnalato molto piu' in basso di dove e' nato.
+# Bash closes the string at the first single quote. Everything else on the line becomes
+# code, and every subsequent line is interpreted from an incorrect quoting state: the error
+# is reported much further down than where it was born.
 #
-# Uso:
+# Usage:
 #   bash scripts/check-scripts.sh
 #
-# Esce con codice 1 se anche un solo script non passa.
+# Exits with code 1 if even a single script fails.
 
 set -euo pipefail
 
@@ -30,15 +31,15 @@ cd "$(dirname "$0")/.."
 fail() { printf '\033[1;31m[x]\033[0m %s\n' "$1" >&2; exit 1; }
 ok()   { printf '\033[1;32m[v]\033[0m %s\n' "$1"; }
 
-# bash e' obbligatorio: gli script dichiarano `#!/usr/bin/env bash` o il path di Termux.
-command -v bash >/dev/null 2>&1 || fail 'bash non trovato nel PATH'
+# bash is mandatory: the scripts declare `#!/usr/bin/env bash` or the Termux path.
+command -v bash >/dev/null 2>&1 || fail 'bash not found in PATH'
 
 mapfile -t scripts < <(find . -name '*.sh' -not -path './node_modules/*' \
   -not -path '*/node_modules/*' | sort)
 
-[ "${#scripts[@]}" -gt 0 ] || fail 'nessuno script .sh trovato: sei nella cartella giusta?'
+[ "${#scripts[@]}" -gt 0 ] || fail 'no .sh script found: are you in the right folder?'
 
-printf 'Controllo di sintassi su %d script\n\n' "${#scripts[@]}"
+printf 'Syntax check on %d scripts\n\n' "${#scripts[@]}"
 
 failed=0
 for f in "${scripts[@]}"; do
@@ -51,19 +52,19 @@ for f in "${scripts[@]}"; do
   fi
 done
 
-[ "$failed" -eq 0 ] || fail "$failed script su ${#scripts[@]} non passano il controllo di sintassi"
+[ "$failed" -eq 0 ] || fail "$failed out of ${#scripts[@]} scripts fail the syntax check"
 
-# Ricerca della causa tipica, anche quando la sintassi oggi regge.
-# Un apostrofo preceduto da barra rovesciata dentro apici singoli e' SEMPRE un errore,
-# anche se per caso il file compila: il messaggio all'utente conterra' una barra rovesciata
-# di troppo e il comportamento cambia appena si aggiunge una riga sopra o sotto.
-printf '\nRicerca della causa tipica (barra rovesciata prima di apostrofo)...\n'
-# I commenti sono esclusi di proposito: questo file stesso contiene la riga sbagliata
-# come esempio da non imitare, ed e' l'unico posto dove e' legittima.
+# Search for the typical cause, even when the syntax currently holds.
+# An apostrophe preceded by a backslash inside single quotes is ALWAYS a bug,
+# even if the file happens to compile: the message shown to the user will contain an extra
+# backslash and the behavior changes as soon as a line is added above or below.
+printf '\nSearch for the typical cause (backslash before apostrophe)...\n'
+# Comments are excluded on purpose: this very file contains the bad line
+# as an example not to imitate, and it is the only legitimate place for it.
 if grep -rnF "\\'" --include='*.sh' . 2>/dev/null | grep -v node_modules \
    | grep -vE ':[0-9]+:[[:space:]]*#'; then
-  fail 'trovato un apostrofo escapato con barra rovesciata: in bash non e un escape. Usa apici doppi, oppure togli l apostrofo.'
+  fail 'found an apostrophe escaped with a backslash: in bash it is not an escape. Use double quotes, or drop the apostrophe.'
 fi
-ok 'nessun apostrofo escapato con barra rovesciata'
+ok 'no apostrophe escaped with a backslash'
 
-printf '\n\033[1;32mTutti gli script passano il controllo di sintassi.\033[0m\n'
+printf '\n\033[1;32mAll scripts pass the syntax check.\033[0m\n'
