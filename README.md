@@ -103,9 +103,9 @@ covers the exact response body.
 | `GuardBlockedError` | `GUARD_BLOCKED` | The policy denied the action. Do not retry: it is a decision. |
 | `GuardPausedError` | `GUARD_PAUSED` | Human review required. Notify and stop. |
 | `GuardHaltedError` | `GUARD_HALTED` | Kill switch is active. Wait for resume. |
-| `GuardQuotaError` | `GUARD_QUOTA` | Quota exhausted (`402`). **Terminal.** Upgrade your plan. |
-| `GuardAuthError` | `GUARD_AUTH` | `401`/`403`. Credential or perimeter. |
-| `GuardPolicyError` | `GUARD_POLICY` | `409`, e.g. mismatched `expected_epoch`. |
+| `GuardQuotaError` | `GUARD_QUOTA_EXCEEDED` | Quota exhausted (`402`). **Terminal.** Upgrade your plan. |
+| `GuardAuthError` | `GUARD_UNAUTHORIZED` (401) / `GUARD_FORBIDDEN` (403) | Credential or perimeter. |
+| `GuardPolicyError` | `GUARD_STALE_POLICY` | `409`, e.g. mismatched `expected_epoch`. |
 | `GuardUnavailableError` | `GUARD_UNAVAILABLE` | Guard unreachable. Fail-closed. |
 | `GuardConfigError` | `GUARD_CONFIG` | Configuration that would weaken guarantees. |
 | `GuardStateInvalidError` | `GUARD_STATE_INVALID` | Kill switch state too stale. |
