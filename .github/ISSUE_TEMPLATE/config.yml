@@ -1,0 +1,10 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/AnterisLab/anterislab-guard/security/advisories/new
+    about: Please report security issues privately. Do not open a public issue.
+
+  - name: Questions and discussions
+    url: https://github.com/AnterisLab/anterislab-guard/discussions
+    about: Ask questions, share ideas, and discuss usage with the community.
