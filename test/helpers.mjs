@@ -1,6 +1,6 @@
 /**
- * Impalcatura di test: un guard *finto* come `fetch`, che risponde a /api/v1/evaluate.
- * Nessuna rete reale: i test provano il comportamento del SDK, non la connettivita'.
+ * Test scaffolding: a *fake* guard as `fetch`, which responds to /api/v1/evaluate.
+ * No real network: the tests exercise the SDK behavior, not connectivity.
  */
 
 import { createHmac } from 'node:crypto';
@@ -11,10 +11,10 @@ import { createHmac } from 'node:crypto';
  * @property {unknown} [body]
  * @property {string} [raw]
  * @property {Record<string,string>} [headers]
- * @property {number} [delayMs]  Ritardo artificiale in ms, per i test di timeout.
+ * @property {number} [delayMs]  Artificial delay in ms, for timeout tests.
  */
 
-/** Costruisce un `fetch` finto e conta le chiamate a /api/v1/evaluate. */
+/** Builds a fake `fetch` and counts calls to /api/v1/evaluate. */
 export function makeFetch(route) {
   const calls = { evaluate: 0, urls: [] };
   const impl = async (url, init) => {
@@ -37,17 +37,17 @@ export function makeFetch(route) {
   return { impl: /** @type {typeof fetch} */ (impl), calls };
 }
 
-/** Corpo di risposta positivo, cosi' i test di diniego hanno un controllo. */
+/** Positive response body, so denial tests have a control case. */
 export function approved(agent = 'billing-bot', extra = {}) {
-  return { decision: 'APPROVED', reason: 'policy consente', policy: null, agent, latency_ms: 3, decision_id: 'd-1', ...extra };
+  return { decision: 'APPROVED', reason: 'policy allows', policy: null, agent, latency_ms: 3, decision_id: 'd-1', ...extra };
 }
 
-/** Firma HMAC-SHA256 sul corpo grezzo, come farebbe il backend. */
+/** HMAC-SHA256 signature over the raw body, as the backend would produce. */
 export function signBody(secret, rawBody) {
   return 'sha256=' + createHmac('sha256', secret).update(rawBody, 'utf8').digest('hex');
 }
 
-/** Agente strumentato: conta gli effetti collaterali realmente prodotti. */
+/** Instrumented agent: counts the side effects actually produced. */
 export function makeAgent() {
   const effects = [];
   const agent = {
@@ -60,7 +60,7 @@ export function makeAgent() {
       return 'ok';
     },
     describe() {
-      return 'agent strumentato';
+      return 'instrumented agent';
     },
   };
   return { agent, effects };
