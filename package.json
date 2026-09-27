@@ -42,7 +42,7 @@
     "lint": "eslint .",
     "test": "npm run build && node --test test/*.test.mjs",
     "test:unit": "node --test test/*.test.mjs",
-    "test:coverage": "npm run build && node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=./coverage/lcov.info test/*.test.mjs",
+    "test:coverage": "mkdir -p coverage && npm run build && node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=./coverage/lcov.info test/*.test.mjs",
     "check:artifact": "node scripts/check-artifact.mjs",
     "prepack": "npm run build && npm run check:artifact",
     "prepublishOnly": "npm run build && npm run check:artifact"
