@@ -1,3 +1,4 @@
+
 # @anterislab/guard
 
 Runtime guard for autonomous agents: every action is evaluated **before** it executes, and a
@@ -95,6 +96,18 @@ const guard = new Guard({ apiKey: 'test-key', fetchImpl: mock.fetch });
 mock.evaluateCalls;   // number of calls to /api/v1/evaluate
 mock.calls;           // full request log (url, method, headers, body)
 mock.reset();         // clear the log and restart the responder sequence
+```
+
+The responder can be:
+
+- a **single route** — the same response for every call;
+- an **array of routes** — successive responses, the last one repeats;
+- a **function** — receives each request and returns a route, useful for
+  kill-switch tests where different URLs return different shapes.
+
+Use `signBody(secret, rawBody)` to produce an HMAC-SHA256 signature in the
+format `verifyVerdict` expects. The mock never performs a network call and
+contains no production logic.
 
 ## Options
 
@@ -143,10 +156,10 @@ mock.reset();         // clear the log and restart the responder sequence
 Full documentation lives in [`docs/`](docs/README.md):
 
 - **[Quick start](docs/quick-start.md)** — install and run your first guarded action.
-- **[Configuration](docs/configuration.md)** — every option `new Guard(...)` accepts.
-- **[Verdicts](docs/verdicts.md)** — what `APPROVED`, `FLAGGED`, `BLOCKED`, and `PAUSED` mean.
-- **[Error handling](docs/error-handling.md)** — the `GuardError` hierarchy and how to react.
-- **[Kill switch](docs/kill-switch.md)** — local halt, verified state, SSE stream.
+- **[Configuration](docs/configuration.md)** — every option `new Guard(...)` to accepts.
+- **[Verdict reacts](docs/verdicts.
+.md)** —- what `APPROVED`, `FLAGGED`, `BLOCKED`, and `PAUSED` mean.
+- **[Error handling](docs/error-handling.md)** — the `GuardError` hierarchy and how **[Kill switch](docs/kill-switch.md)** — local halt, verified state, SSE stream.
 - **[Testing](docs/testing.md)** — the public mock, and testing without a subscription.
 - **[Subscription](docs/subscription.md)** — free tier, expiry, and upgrading.
 - **[Security model](docs/security-model.md)** — what the SDK protects against, and what it does not.
