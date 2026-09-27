@@ -1,6 +1,11 @@
 
 # @anterislab/guard
 
+[![CI](https://github.com/AnterisLab/anterislab-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/AnterisLab/anterislab-guard/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/AnterisLab/anterislab-guard/graph/badge.svg)](https://codecov.io/gh/AnterisLab/anterislab-guard)
+[![npm](https://img.shields.io/npm/v/@anterislab/guard.svg)](https://www.npmjs.com/package/@anterislab/guard)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Runtime guard for autonomous agents: every action is evaluated **before** it executes, and a
 stop order actually stops the agent.
 
