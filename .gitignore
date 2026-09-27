@@ -3,3 +3,4 @@ dist
 .env
 anterislab-guard.git.bak/
 .release-tmp/
+coverage/
