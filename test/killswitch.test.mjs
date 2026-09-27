@@ -75,7 +75,7 @@ function makeMock({ getToken, status = 200 }) {
   });
 }
 
-function makeManager({ mock, now, extra = {} }) {
+function makeManager({ mock, extra = {} }) {
   return new KillSwitchManager({
     tenant: TENANT,
     agent: AGENT,
@@ -84,7 +84,6 @@ function makeManager({ mock, now, extra = {} }) {
     allowedAlgorithms: ['HS256'],
     pinnedKeys: { [KID]: { kty: 'oct', k: SECRET_B64U } },
     fetchImpl: mock.fetch,
-    ...(now ? { now } : {}),
     ...extra,
   });
 }
@@ -149,14 +148,26 @@ test('resumeLocal without a newer verified state is refused', async () => {
   );
 });
 
-test('resumeLocal with break-glass clears the local halt', async () => {
-  const mock = makeMock({ getToken: () => buildSignedToken(baseClaims()) });
+test('resumeLocal with break-glass clears the local halt and requires re-verification', async () => {
+  const token = buildSignedToken(baseClaims({ state: 'RUNNING', epoch: 1 }));
+  const mock = makeMock({ getToken: () => token });
   const manager = makeManager({ mock });
+
   await manager.haltLocal('operator');
-  assert.equal(manager.halted, true);
+  assert.equal(manager.halted, true, 'halted after local halt');
+
   const status = await manager.resumeLocal({ reason: 'cleared by operator', breakGlass: true });
-  assert.equal(status.halted, false);
-  assert.equal(manager.halted, false);
+  assert.equal(status.halted, false, 'the returned status is not halted');
+
+  // The getter stays fail-closed until a control-plane state is verified again.
+  // This is deliberate: "not halted" from break-glass means "allow the next
+  // enforce() to re-check", not "authorize now".
+  assert.equal(manager.halted, true, 'getter fails closed until re-verified');
+
+  // enforce() triggers a refresh and, with a RUNNING token, the halt clears.
+  const enforced = await manager.enforce();
+  assert.equal(enforced.halted, false, 'after enforce, RUNNING is accepted');
+  assert.equal(manager.halted, false, 'getter reflects the verified state');
 });
 
 test('resumeLocal with break-glass requires a non-empty reason', async () => {
@@ -192,28 +203,20 @@ test('enforce({ refresh: false }) uses the cached state without a network call',
 
 // --- Anti-rollback: a lower epoch is refused ---
 
-test('a RUNNING token with a lower epoch is rejected (anti-rollback)', async () => {
-  let clock = 1000;
-  let currentEpoch = 5;
-  const mock = createMockFetch((req) => {
-    if (req.url.includes('/api/v1/killswitch/state')) {
-      return {
-        status: 200,
-        body: { token: buildSignedToken(baseClaims({ epoch: currentEpoch })), claims: {}, server_time: 0 },
-      };
-    }
-    return { status: 404 };
-  });
-  const manager = makeManager({ mock, now: () => clock, extra: { maxStaleSeconds: 0 } });
+test('verifyStatus rejects a RUNNING token with a lower epoch (anti-rollback)', async () => {
+  const mock = makeMock({ getToken: () => buildSignedToken(baseClaims({ epoch: 5 })) });
+  const manager = makeManager({ mock });
 
-  // First enforce: epoch 5 RUNNING is accepted.
+  // Establish epoch 5 first, so highestEpoch becomes 5.
   await manager.enforce();
 
-  // Advance time so the cached state is considered stale, and present an older epoch.
-  clock = 1001;
-  currentEpoch = 3;
+  // Now present a token with a lower epoch directly to verifyStatus.
+  const lowerToken = buildSignedToken(baseClaims({ epoch: 3 }));
+  const result = await manager.verifyStatus(lowerToken);
 
-  await assert.rejects(() => manager.enforce(), KillSwitchHaltedError);
+  assert.equal(result.ok, false, 'a lower epoch must be rejected');
+  assert.equal(result.code, 'KILL_SWITCH_STATE_ROLLBACK');
+  assert.match(result.detail, /3 < previously seen 5/);
 });
 
 // --- Local audit trail ---
