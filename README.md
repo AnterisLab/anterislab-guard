@@ -138,6 +138,23 @@ mock.reset();         // clear the log and restart the responder sequence
 6. The API key never appears in URLs, bodies, or logs.
 7. A halt arriving during evaluation still stops the action (anti-TOCTOU).
 
+## Documentation
+
+Full documentation lives in [`docs/`](docs/README.md):
+
+- **[Quick start](docs/quick-start.md)** — install and run your first guarded action.
+- **[Configuration](docs/configuration.md)** — every option `new Guard(...)` accepts.
+- **[Verdicts](docs/verdicts.md)** — what `APPROVED`, `FLAGGED`, `BLOCKED`, and `PAUSED` mean.
+- **[Error handling](docs/error-handling.md)** — the `GuardError` hierarchy and how to react.
+- **[Kill switch](docs/kill-switch.md)** — local halt, verified state, SSE stream.
+- **[Testing](docs/testing.md)** — the public mock, and testing without a subscription.
+- **[Subscription](docs/subscription.md)** — free tier, expiry, and upgrading.
+- **[Security model](docs/security-model.md)** — what the SDK protects against, and what it does not.
+- **[API reference](docs/api-reference.md)** — the complete public surface.
+
+For vulnerability reporting, see [SECURITY.md](SECURITY.md).
+For contributing, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 MIT
