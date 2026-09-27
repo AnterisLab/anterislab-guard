@@ -1,3 +1,4 @@
+
 {
   "name": "@anterislab/guard",
   "version": "0.2.1",
@@ -38,7 +39,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "lint": "biome check .",
+    "lint": "eslint .",
     "test": "npm run build && node --test test/*.test.mjs",
     "test:unit": "node --test test/*.test.mjs",
     "test:coverage": "npm run build && node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=./coverage/lcov.info test/*.test.mjs",
@@ -47,9 +48,11 @@
     "prepublishOnly": "npm run build && npm run check:artifact"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
+    "@eslint/js": "^9.18.0",
     "@types/node": "^20.19.43",
-    "typescript": "^5.9.3"
+    "eslint": "^9.18.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.20.0"
   },
   "repository": {
     "type": "git",
