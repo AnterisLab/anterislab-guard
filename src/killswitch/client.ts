@@ -496,13 +496,13 @@ export class KillSwitchManager {
       server_time?: unknown;
       state?: { token?: unknown; claims?: unknown };
     };
-    // Due forme legittime sullo stesso endpoint, e accettarle entrambe e' deliberato:
-    //  - `{ token, claims, server_time }`     (forma piatta);
-    //  - `{ state: { token, claims }, audit, replayed }`  (busta canonica del control plane).
-    // La lezione: accettare la busta NON basta, va anche NORMALIZZATA. La prima versione
-    // controllava entrambe le posizioni ma restituiva l'oggetto originale, quindi il chiamante
-    // leggeva `state.token` su una busta e otteneva `undefined` -> "malformed compact JWS".
-    // Un controllo e la sua normalizzazione devono stare nello stesso posto.
+    // Two legitimate shapes on the same endpoint, and accepting both is deliberate:
+    //  - `{ token, claims, server_time }`     (flat shape);
+    //  - `{ state: { token, claims }, audit, replayed }`  (canonical control-plane envelope).
+    // The lesson: accepting the envelope is NOT enough, it also has to be NORMALIZED. The first
+    // version checked both positions but returned the original object, so the caller read
+    // `state.token` on an envelope and got `undefined` -> "malformed compact JWS".
+    // A check and its normalization must live in the same place.
     const flat = typeof candidate?.token === 'string' && candidate.token.length > 0 ? candidate : null;
     const nested =
       !flat &&
