@@ -28,12 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `test/helpers.mjs` now reuses the public mock (`@anterislab/guard/mock`)
-  instead of maintaining a private duplicate. If the public mock is not good
-  enough for our own tests, it is not good enough for consumers.
-- All user-facing content translated to English: README, source comments, error
-  messages, CLI messages, test descriptions and fixtures. AnterisLab Guard is an
-  international project; English is its primary language.
+- **Minimum Node.js version raised from 18 to 20.** The kill switch uses
+  `globalThis.crypto.subtle` for the local audit trail hash chain and for JWS
+  signature verification. Node 18 does not expose WebCrypto as a global by
+  default; it was fixed in Node 20. Node 18 reached end-of-life in April 2025.
 
 ### Fixed
 
