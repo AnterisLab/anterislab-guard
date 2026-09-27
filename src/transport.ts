@@ -1,14 +1,15 @@
 /**
- * Trasporto HTTP verso /api/v1/evaluate.
+ * HTTP transport to /api/v1/evaluate.
  *
- * Vincoli non negoziabili, che sono anche il motivo per cui questo file esiste separato:
- *  - il timeout copre l'INTERA transazione, lettura del corpo inclusa (un endpoint che risponde
- *    con gli header e poi tace non deve bloccare l'agente per sempre);
- *  - i retry coprono solo guasti di trasporto e 5xx. Mai 401/402/403/409;
- *  - su 429 si attende il `Retry-After` DICHIARATO, per intero, oppure si rifiuta: non si ignora;
- *  - la chiave API non compare mai in URL, in corpo o in un messaggio di errore;
- *  - l'`Idempotency-Key` viene generata una volta e riusata su ogni tentativo, cosi' un retry non
- *    consuma due volte la quota del piano.
+ * Non-negotiable constraints, which are also why this file exists separately:
+ *  - the timeout covers the ENTIRE transaction, including body reads (an endpoint that responds
+ *    with headers and then goes silent must not block the agent forever);
+ *  - retries cover only transport failures and 5xx. Never 401/402/403/409;
+ *  - on 429 the DECLARED `Retry-After` is honored in full, or the request is rejected: it is
+ *    not ignored;
+ *  - the API key never appears in a URL, a body, or an error message;
+ *  - the `Idempotency-Key` is generated once and reused on every attempt, so a retry does not
+ *    consume plan quota twice.
  */
 
 import { GuardAuthError, GuardPolicyError, GuardQuotaError, GuardUnavailableError } from './errors.js';
@@ -28,18 +29,18 @@ export interface TransportResponse {
   status: number;
   body: unknown;
   headers: Headers;
-  /** Byte esatti del corpo: servono alla verifica della firma HMAC. */
+  /** Exact body bytes: needed for HMAC signature verification. */
   rawBody: string;
 }
 
-/** Un errore HTTP terminale: mappato su una classe della gerarchia GuardError. */
+/** A terminal HTTP error: mapped onto a class of the GuardError hierarchy. */
 export function mapHttpError(status: number, body: unknown): Error {
   const record = (body !== null && typeof body === 'object' ? body : {}) as Record<string, unknown>;
   const message = typeof record.message === 'string' ? record.message : `HTTP ${status}`;
 
   switch (status) {
     case 401:
-      return new GuardAuthError(401, 'chiave API assente, non valida o revocata');
+      return new GuardAuthError(401, 'API key missing, invalid, or revoked');
     case 402:
       return new GuardQuotaError(
         typeof record.plan === 'string' ? record.plan : null,
@@ -55,7 +56,7 @@ export function mapHttpError(status: number, body: unknown): Error {
         typeof record.received === 'string' ? record.received : null,
       );
     default:
-      return new GuardUnavailableError(`il guard ha risposto HTTP ${status}: ${message}`);
+      return new GuardUnavailableError(`the guard responded with HTTP ${status}: ${message}`);
   }
 }
 
@@ -81,8 +82,8 @@ export class Transport {
   }
 
   /**
-   * Esegue una valutazione. Non interpreta il verdetto: restituisce la risposta grezza.
-   * Un esito non-200 che sia un errore HTTP terminale viene sollevato qui.
+   * Runs an evaluation. It does not interpret the verdict: it returns the raw response.
+   * A non-200 outcome that is a terminal HTTP error is thrown here.
    */
   async evaluate(
     payload: { agent: string; action: Record<string, unknown>; context?: Record<string, unknown> },
@@ -118,10 +119,10 @@ export class Transport {
           signal: controller.signal,
         });
 
-        // Il timeout deve coprire anche la lettura del corpo: `fetch` risolve appena arrivano
-        // gli header, quindi una lettura lenta sarebbe altrimenti illimitata. E non basta
-        // `AbortController`: una `fetch` malata (o un polyfill che ignora il signal) bloccherebbe
-        // l'agente per sempre. La scadenza viene quindi imposta QUI, sul tempo di attesa.
+        // The timeout must also cover body reads: `fetch` resolves as soon as headers arrive,
+        // so a slow read would otherwise be unbounded. And `AbortController` is not enough: a
+        // broken `fetch` (or a polyfill that ignores the signal) would block the agent forever.
+        // The deadline is therefore enforced HERE, on wait time.
         let rawBody: string;
         try {
           rawBody = await this.withDeadline(response.text(), () => {
@@ -133,7 +134,7 @@ export class Transport {
         }
 
         if (rawBody.length > 262_144) {
-          throw new GuardUnavailableError('la risposta del guard supera i 256 KiB: rifiutata');
+          throw new GuardUnavailableError('the guard response exceeds 256 KiB: rejected');
         }
 
         let parsed: unknown = null;
@@ -141,8 +142,8 @@ export class Transport {
           try {
             parsed = JSON.parse(rawBody);
           } catch {
-            // Un corpo non-JSON (captive portal, pagina di errore del proxy) e' un guasto,
-            // non un permesso. Diventa una risposta 200 non interpretabile -> diniego a valle.
+            // A non-JSON body (captive portal, proxy error page) is a failure, not a permission.
+            // It becomes an unparseable 200 response -> downstream denial.
             parsed = null;
           }
         }
@@ -150,10 +151,10 @@ export class Transport {
 
         if (response.status === 429) {
           const waitMs = parseRetryAfter(response.headers);
-          if (waitMs === null) throw new GuardUnavailableError('rate limit senza Retry-After: non si presume nulla');
+          if (waitMs === null) throw new GuardUnavailableError('rate limit without Retry-After: nothing is assumed');
           if (waitMs > this.options.maxRetryAfterMs || attempt > this.options.retries) {
             throw new GuardUnavailableError(
-              `rate limit con attesa richiesta di ${Math.round(waitMs / 1000)} s, oltre il budget consentito`,
+              `rate limit requesting a wait of ${Math.round(waitMs / 1000)} s, over the allowed budget`,
             );
           }
           await sleep(waitMs + Math.floor(Math.random() * 250));
@@ -162,7 +163,7 @@ export class Transport {
 
         if (response.status >= 500) {
           if (attempt > this.options.retries) {
-            throw new GuardUnavailableError(`il guard e' indisponibile (HTTP ${response.status})`);
+            throw new GuardUnavailableError(`the guard is unavailable (HTTP ${response.status})`);
           }
           await sleep(200 * 2 ** (attempt - 1) + Math.floor(Math.random() * 100));
           continue;
@@ -174,9 +175,9 @@ export class Transport {
       } catch (error) {
         clearTimeout(timer);
         if (error instanceof Error && error.name.startsWith('Guard')) throw error;
-        if (timedOut) throw new GuardUnavailableError(`timeout (${this.options.timeoutMs} ms) verso ${this.options.baseUrl}`);
+        if (timedOut) throw new GuardUnavailableError(`timeout (${this.options.timeoutMs} ms) to ${this.options.baseUrl}`);
         if (attempt > this.options.retries) {
-          throw new GuardUnavailableError(`guasto di rete verso ${this.options.baseUrl}: ${(error as Error).message}`);
+          throw new GuardUnavailableError(`network failure to ${this.options.baseUrl}: ${(error as Error).message}`);
         }
         await sleep(200 * 2 ** (attempt - 1));
       }
@@ -184,12 +185,12 @@ export class Transport {
   }
 
   /**
-   * Impone una scadenza a una promessa qualunque. Serve perche' il timeout non puo' dipendere
-   * dalla buona volonta' dell'implementazione di `fetch`: se il signal viene ignorato, l'agente
-   * deve comunque riprendere il controllo e negare l'azione.
+   * Enforces a deadline on any promise. It exists because the timeout must not depend on the
+   * good will of the `fetch` implementation: if the signal is ignored, the agent must still
+   * regain control and deny the action.
    */
   private async withDeadline<T>(promise: Promise<T>, onTimeout: () => void): Promise<T> {
-    void promise.catch(() => undefined); // la perdente della corsa non deve restare "unhandled"
+    void promise.catch(() => undefined); // the losing side of the race must not remain unhandled
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       return await Promise.race([
@@ -199,7 +200,7 @@ export class Transport {
             onTimeout();
             reject(
               new GuardUnavailableError(
-                `timeout (${this.options.timeoutMs} ms) durante la lettura del corpo della risposta`,
+                `timeout (${this.options.timeoutMs} ms) while reading the response body`,
               ),
             );
           }, this.options.timeoutMs);
@@ -210,10 +211,10 @@ export class Transport {
     }
   }
 
-  /** Difesa in profondita': la chiave non deve mai finire in un corpo di risposta o di errore. */
+  /** Defense in depth: the key must never end up in a response or error body. */
   private assertNoKeyLeak(rawBody: string): void {
     if (this.options.apiKey.length >= 16 && rawBody.includes(this.options.apiKey)) {
-      throw new GuardUnavailableError('la risposta del guard conteneva la chiave API: rifiutata');
+      throw new GuardUnavailableError('the guard response contained the API key: rejected');
     }
   }
 }
