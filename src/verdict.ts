@@ -1,34 +1,34 @@
 /**
- * Vocabolario dei verdetti.
+ * Verdict vocabulary.
  *
- * Questa e' l'unica implementazione della decisione "l'azione puo' partire?".
- * La regola e' una allow-list positiva: autorizzano SOLO `APPROVED` e `FLAGGED`.
- * Tutto il resto - campo assente, parola sconosciuta, corpo non-oggetto, HTML di un captive
- * portal, JSON troncato - e' un DINIEGO. Non e' un caso limite: e' il comportamento di default.
+ * This is the single implementation of the decision "may the action proceed?".
+ * The rule is a positive allow-list: only `APPROVED` and `FLAGGED` authorize.
+ * Everything else - missing field, unknown word, non-object body, HTML from a captive
+ * portal, truncated JSON - is a DENIAL. It is not an edge case: it is the default behavior.
  *
- * Il difetto della 0.1.1 era esattamente qui: il codice leggeva `decision === 'BLOCKED'`, quindi
- * una risposta con `{"verdict":"block"}` (lo schema documentato) non matchava e l'azione
- * partiva. Il fail-open non era un bug di trasporto: era la forma del controllo.
+ * The 0.1.1 defect was exactly here: the code read `decision === 'BLOCKED'`, so a response
+ * with `{"verdict":"block"}` (the documented schema) did not match and the action went
+ * through. Fail-open was not a transport bug: it was the shape of the check.
  */
 
 export type CanonicalVerdict = 'APPROVED' | 'FLAGGED' | 'PAUSED' | 'BLOCKED';
 
-/** Verdetto che NON puo' mai arrivare dal server: e' riservato al client. */
+/** Verdict that must NEVER arrive from the server: it is reserved for the client. */
 export const CLIENT_LOCAL_VERDICT = 'UNAVAILABLE';
 
-/** Gli unici verdetti che autorizzano l'esecuzione. */
+/** The only verdicts that authorize execution. */
 export const AUTHORIZING_VERDICTS: readonly CanonicalVerdict[] = ['APPROVED', 'FLAGGED'];
 
-/** Verdetti che sospendono o negano. */
+/** Verdicts that suspend or deny. */
 export const BLOCKING_VERDICTS: readonly CanonicalVerdict[] = ['PAUSED', 'BLOCKED'];
 
-/** Vocabolario canonico completo che il backend puo' emettere. */
+/** Full canonical vocabulary the backend may emit. */
 export const CANONICAL_VERDICTS: readonly CanonicalVerdict[] = ['APPROVED', 'FLAGGED', 'PAUSED', 'BLOCKED'];
 
 /**
- * Alias legacy accettati sul filo. Il backend deve emettere il canonico (`decision`); questi
- * esistono solo perche' i client 0.1.x li accettavano e un rilascio coordinato non e' realistico.
- * Ogni alias e' un valore, mai una sottostringa: nessun `includes()`.
+ * Legacy aliases accepted on the wire. The backend must emit the canonical (`decision`); these
+ * exist only because 0.1.x clients accepted them and a coordinated release is not realistic.
+ * Every alias is a value, never a substring: no `includes()`.
  */
 export const VERDICT_ALIASES: Readonly<Record<string, CanonicalVerdict>> = Object.freeze({
   approve: 'APPROVED',
@@ -45,24 +45,24 @@ export const VERDICT_ALIASES: Readonly<Record<string, CanonicalVerdict>> = Objec
   denied: 'BLOCKED',
 });
 
-/** Campi su cui il verdetto puo' arrivare. `decision` e' il canonico, `verdict` lo specchio legacy. */
+/** Fields the verdict may arrive on. `decision` is canonical, `verdict` is the legacy mirror. */
 export const PRIMARY_VERDICT_FIELD = 'decision';
 export const LEGACY_VERDICT_FIELD = 'verdict';
 
 export interface ParsedDecision {
-  /** Sempre canonico, sempre uno dei quattro. */
+  /** Always canonical, always one of the four. */
   decision: CanonicalVerdict;
   reason: string;
   policy: string | null;
   decisionId: string | null;
   latencyMs: number | null;
-  /** Identita' che il backend dichiara di aver valutato. */
+  /** Identity the backend claims to have evaluated. */
   agent: string | null;
 }
 
 export interface VerdictRejection {
   ok: false;
-  /** Codice stabile, per log e metriche. */
+  /** Stable code, for logs and metrics. */
   code: string;
   detail: string;
 }
@@ -70,8 +70,8 @@ export interface VerdictRejection {
 export type VerdictOutcome = { ok: true; decision: ParsedDecision } | VerdictRejection;
 
 /**
- * Normalizza un valore grezzo a un verdetto canonico. `null` significa "non riconosciuto",
- * che per il chiamante e' un diniego.
+ * Normalizes a raw value to a canonical verdict. `null` means "unrecognized",
+ * which is a denial for the caller.
  */
 export function canonicalizeVerdict(value: unknown): CanonicalVerdict | null {
   if (typeof value !== 'string') return null;
@@ -82,7 +82,7 @@ export function canonicalizeVerdict(value: unknown): CanonicalVerdict | null {
   return VERDICT_ALIASES[normalized.toLowerCase()] ?? null;
 }
 
-/** true quando il verdetto autorizza l'esecuzione. */
+/** true when the verdict authorizes execution. */
 export function isAuthorizing(verdict: CanonicalVerdict): boolean {
   return AUTHORIZING_VERDICTS.includes(verdict);
 }
@@ -95,23 +95,23 @@ function optionalString(value: unknown, max = 256): string | null {
 }
 
 /**
- * Interpreta il corpo di una risposta /evaluate.
+ * Interprets the body of an /evaluate response.
  *
- * Ordine dei controlli, deliberato:
- *  1. il corpo deve essere un oggetto JSON (non array, non null, non HTML, non troncato);
- *  2. entrambi i campi verdetto vengono normalizzati;
- *  3. se entrambi sono presenti e canonicalizzano a valori DIVERSI -> diniego (mai scegliere il
- *     piu' permissivo);
- *  4. se nessuno dei due e' riconosciuto -> diniego;
- *  5. `UNAVAILABLE` dal server -> diniego (il server non deve mai emetterlo);
- *  6. il resto e' deterministico: il verdetto canonicalizzato decide.
+ * Order of checks, deliberate:
+ *  1. the body must be a JSON object (not array, not null, not HTML, not truncated);
+ *  2. both verdict fields are normalized;
+ *  3. if both are present and canonicalize to DIFFERENT values -> denial (never pick the
+ *     more permissive one);
+ *  4. if neither is recognized -> denial;
+ *  5. `UNAVAILABLE` from the server -> denial (the server must never emit it);
+ *  6. the rest is deterministic: the canonicalized verdict decides.
  */
 export function parseVerdict(body: unknown, expectedAgent?: string | null): VerdictOutcome {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) {
     return {
       ok: false,
       code: 'verdict_body_not_object',
-      detail: `il corpo della risposta non e' un oggetto JSON (ricevuto: ${Array.isArray(body) ? 'array' : body === null ? 'null' : typeof body})`,
+      detail: `the response body is not a JSON object (received: ${Array.isArray(body) ? 'array' : body === null ? 'null' : typeof body})`,
     };
   }
 
@@ -121,19 +121,19 @@ export function parseVerdict(body: unknown, expectedAgent?: string | null): Verd
   const primaryRaw = record[PRIMARY_VERDICT_FIELD];
   const legacyRaw = record[LEGACY_VERDICT_FIELD];
 
-  // Un campo presente ma non riconosciuto e' un diniego esplicito, non un "assente".
+  // A field present but unrecognized is an explicit denial, not an "absent" one.
   if (primaryRaw !== undefined && primary === null) {
-    return { ok: false, code: 'verdict_unknown_word', detail: `campo "decision" non riconosciuto: ${JSON.stringify(primaryRaw).slice(0, 64)}` };
+    return { ok: false, code: 'verdict_unknown_word', detail: `unrecognized "decision" field: ${JSON.stringify(primaryRaw).slice(0, 64)}` };
   }
   if (legacyRaw !== undefined && legacy === null) {
-    return { ok: false, code: 'verdict_unknown_word', detail: `campo "verdict" non riconosciuto: ${JSON.stringify(legacyRaw).slice(0, 64)}` };
+    return { ok: false, code: 'verdict_unknown_word', detail: `unrecognized "verdict" field: ${JSON.stringify(legacyRaw).slice(0, 64)}` };
   }
 
   if (primary !== null && legacy !== null && primary !== legacy) {
     return {
       ok: false,
       code: 'verdict_conflict',
-      detail: `"decision" (${primary}) e "verdict" (${legacy}) si contraddicono: nessuna delle due viene applicata`,
+      detail: `"decision" (${primary}) and "verdict" (${legacy}) contradict each other: neither is applied`,
     };
   }
 
@@ -142,7 +142,7 @@ export function parseVerdict(body: unknown, expectedAgent?: string | null): Verd
     return {
       ok: false,
       code: 'verdict_missing',
-      detail: 'la risposta non contiene alcun campo verdetto riconoscibile (atteso "decision")',
+      detail: 'the response does not contain any recognizable verdict field (expected "decision")',
     };
   }
 
@@ -150,7 +150,7 @@ export function parseVerdict(body: unknown, expectedAgent?: string | null): Verd
     return {
       ok: false,
       code: 'verdict_server_emitted_local',
-      detail: `${CLIENT_LOCAL_VERDICT} e' riservato al client: un server che lo emette non ha valutato nulla`,
+      detail: `${CLIENT_LOCAL_VERDICT} is reserved for the client: a server that emits it has evaluated nothing`,
     };
   }
 
@@ -159,7 +159,7 @@ export function parseVerdict(body: unknown, expectedAgent?: string | null): Verd
     return {
       ok: false,
       code: 'verdict_agent_mismatch',
-      detail: `il verdetto riguarda l'agente "${agent}" ma questo client e' "${expectedAgent}"`,
+      detail: `the verdict concerns agent "${agent}" but this client is "${expectedAgent}"`,
     };
   }
 
@@ -168,7 +168,7 @@ export function parseVerdict(body: unknown, expectedAgent?: string | null): Verd
     ok: true,
     decision: {
       decision,
-      reason: optionalString(record.reason, 256) ?? 'nessun motivo fornito',
+      reason: optionalString(record.reason, 256) ?? 'no reason provided',
       policy: optionalString(record.policy, 128),
       decisionId: optionalString(record.decision_id, 128),
       latencyMs: typeof latency === 'number' && Number.isFinite(latency) ? latency : null,
