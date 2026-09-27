@@ -41,6 +41,7 @@ info '5/7 artifact == source (rebuild and byte-by-byte comparison)'
 node scripts/check-artifact.mjs
 
 info '6/7 package contents'
+mkdir -p ./.release-tmp
 npm pack --dry-run 2>&1 | tee ./.release-tmp/pack-contents.txt
 for required in 'dist/index.js' 'dist/index.d.ts' 'LICENSE' 'README.md'; do
   grep -q "$required" ./.release-tmp/pack-contents.txt || fail "the package would not contain $required"
