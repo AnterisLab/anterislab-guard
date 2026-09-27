@@ -4,7 +4,7 @@
 Runtime guard for autonomous agents: every action is evaluated **before** it executes, and a
 stop order actually stops the agent.
 
-Zero runtime dependencies. Node 18+.
+Zero runtime dependencies. Node 20+.
 
 ## Requirements
 
