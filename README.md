@@ -1,17 +1,25 @@
 # @anterislab/guard
 
-Guardia runtime per agenti autonomi: ogni azione viene valutata **prima** di essere eseguita, e un
-ordine di fermarsi ferma davvero l'agente.
+Runtime guard for autonomous agents: every action is evaluated **before** it executes, and a
+stop order actually stops the agent.
 
-Zero dipendenze runtime. Node 18+.
+Zero runtime dependencies. Node 18+.
 
-## Installazione
+## Requirements
+
+AnterisLab Guard is the open-source client SDK for the AnterisLab policy engine. It requires an
+active AnterisLab subscription to function. A 14-day free tier is available for evaluation.
+
+The policy engine and kill switch run in the AnterisLab cloud. This SDK provides the client side:
+enforcement, transport, verdict verification, and kill switch coordination.
+
+## Installation
 
 ```bash
 npm install @anterislab/guard
 ```
 
-## Uso minimo
+## Minimal usage
 
 ```js
 import { Guard, GuardBlockedError } from '@anterislab/guard';
@@ -24,23 +32,23 @@ const charge = guard.wrapFn(paymentAgent.charge, {
 });
 
 try {
-  await charge(4200);        // se il gate nega, charge() NON viene invocata
+  await charge(4200);        // if the gate denies, charge() is NOT invoked
 } catch (error) {
   if (error instanceof GuardBlockedError) {
-    console.error('azione negata:', error.message);
+    console.error('action denied:', error.message);
   }
 }
 ```
 
-## Copertura completa: `wrap()`
+## Full coverage: `wrap()`
 
-`wrap()` protegge **ogni** metodo dell'oggetto. Le eccezioni si dichiarano una per una:
+`wrap()` protects **every** method on the object. Exceptions are declared one by one:
 
 ```js
 const safe = guard.wrap(agent, { agent: 'billing-bot', passthrough: ['describe'] });
-await safe.charge(10);     // valutato
-await safe.refund(10);     // valutato
-safe.describe();           // passante, dichiarato esplicitamente
+await safe.charge(10);     // evaluated
+await safe.refund(10);     // evaluated
+safe.describe();           // passthrough, explicitly declared
 ```
 
 ## Kill switch
@@ -51,67 +59,67 @@ const guard = new Guard({
   killSwitch: { tenant: 'acme', agent: 'billing-bot', baseUrl, apiKey },
 });
 
-await guard.halt('incidente in corso', 'INC-1234');   // ferma ORA, senza round-trip
+await guard.halt('incident in progress', 'INC-1234');   // stops NOW, no round-trip
 await guard.status();
-await guard.resume({ reason: 'fine incidente', evidence: 'INC-1234' });
+await guard.resume({ reason: 'incident resolved', evidence: 'INC-1234' });
 
-const stop = await guard.startStream();   // halt via SSE in pochi millisecondi
+const stop = await guard.startStream();   // halt via SSE in milliseconds
 ```
 
-Con `maxStaleSeconds: 0` il client rivalida lo stato a ogni azione; con il default (90 s) riduce i
-round-trip e fa affidamento sul controllo lato server come secondo strato.
+With `maxStaleSeconds: 0` the client revalidates state on every action; with the default (90 s) it
+reduces round-trips and relies on server-side enforcement as a second layer.
 
-## Verdetti firmati
+## Signed verdicts
 
 ```js
 new Guard({ apiKey, verifyVerdict: process.env.ANTERISLAB_VERDICT_SECRET });
 ```
 
-Con `verifyVerdict` configurato, un verdetto positivo **non firmato** viene rifiutato. La firma copre
-il corpo esatto della risposta.
+When `verifyVerdict` is configured, an unsigned positive verdict is **rejected**. The signature
+covers the exact response body.
 
-## Opzioni
+## Options
 
-| Opzione | Default | Descrizione |
+| Option | Default | Description |
 |---|---|---|
-| `apiKey` | — | **Obbligatoria.** Non compare mai in URL, corpo o messaggi d'errore. |
-| `baseUrl` | `https://www.anterislab.com` | Origine del control plane. Deve essere in `allowedHosts`. |
-| `allowedHosts` | `anterislab.com`, `www.anterislab.com` | Host verso cui la chiave puo' viaggiare. |
-| `allowInsecureHttp` | `false` | Consente `http://` **solo** su loopback, per lo sviluppo. |
-| `timeoutMs` | `5000` | Copre l'intera transazione, lettura del corpo inclusa. |
-| `retries` | `1` | Solo su guasti di trasporto e 5xx. Mai su 401/402/403/409. |
-| `maxRetryAfterMs` | `30000` | Attesa massima onorata da un `Retry-After`. Oltre: rifiuto. |
-| `failOpen` | `false` | Su guard irraggiungibile prosegue registrando `UNAVAILABLE`. **Non solleva mai un `APPROVED` reale e non aggira un 402.** |
-| `verifyVerdict` | — | Segreto HMAC o tuo verificatore `(body, signature) => boolean`. |
-| `idempotency` | `true` | `Idempotency-Key` per azione, riusata su ogni retry. |
-| `expectedAgent` | — | Vincola il client a una sola identita' agente. |
-| `onDecision` | — | Telemetria su ogni verdetto. Non puo' cambiare l'esito. |
-| `onPaused` | — | **Notifica.** Se risolve, rigetta o solleva, l'azione non parte. |
+| `apiKey` | — | **Required.** Never appears in URLs, bodies, or error messages. |
+| `baseUrl` | `https://www.anterislab.com` | Control plane origin. Must be listed in `allowedHosts`. |
+| `allowedHosts` | `anterislab.com`, `www.anterislab.com` | Hosts the key is allowed to travel to. |
+| `allowInsecureHttp` | `false` | Allows `http://` **only** on loopback, for development. |
+| `timeoutMs` | `5000` | Covers the entire transaction, including body reads. |
+| `retries` | `1` | Only on transport failures and 5xx. Never on 401/402/403/409. |
+| `maxRetryAfterMs` | `30000` | Maximum delay honored from a `Retry-After`. Beyond that: reject. |
+| `failOpen` | `false` | If the guard is unreachable, proceeds and records `UNAVAILABLE`. **Never raises a real `APPROVED` and never bypasses a 402.** |
+| `verifyVerdict` | — | HMAC secret or custom verifier `(body, signature) => boolean`. |
+| `idempotency` | `true` | `Idempotency-Key` per action, reused across retries. |
+| `expectedAgent` | — | Pins the client to a single agent identity. |
+| `onDecision` | — | Telemetry on every verdict. Cannot change the outcome. |
+| `onPaused` | — | **Notification.** If it resolves, rejects, or throws, the action does not run. |
 
-## Errori
+## Errors
 
-| Classe | `code` | Cosa fare |
+| Class | `code` | What to do |
 |---|---|---|
-| `GuardBlockedError` | `GUARD_BLOCKED` | La policy ha negato. Non ritentare: e' una decisione. |
-| `GuardPausedError` | `GUARD_PAUSED` | Serve una revisione umana. Notifica e fermati. |
-| `GuardHaltedError` | `GUARD_HALTED` | Kill switch attivo. Attendi il resume. |
-| `GuardQuotaError` | `GUARD_QUOTA` | Quota esaurita (`402`). **Terminale.** Alza il piano. |
-| `GuardAuthError` | `GUARD_AUTH` | `401`/`403`. Credenziale o perimetro. |
-| `GuardPolicyError` | `GUARD_POLICY` | `409`, es. `expected_epoch` non corrispondente. |
-| `GuardUnavailableError` | `GUARD_UNAVAILABLE` | Guard irraggiungibile. Fail-closed. |
-| `GuardConfigError` | `GUARD_CONFIG` | Configurazione che indebolirebbe le garanzie. |
-| `GuardStateInvalidError` | `GUARD_STATE_INVALID` | Stato del kill switch troppo vecchio. |
+| `GuardBlockedError` | `GUARD_BLOCKED` | The policy denied the action. Do not retry: it is a decision. |
+| `GuardPausedError` | `GUARD_PAUSED` | Human review required. Notify and stop. |
+| `GuardHaltedError` | `GUARD_HALTED` | Kill switch is active. Wait for resume. |
+| `GuardQuotaError` | `GUARD_QUOTA` | Quota exhausted (`402`). **Terminal.** Upgrade your plan. |
+| `GuardAuthError` | `GUARD_AUTH` | `401`/`403`. Credential or perimeter. |
+| `GuardPolicyError` | `GUARD_POLICY` | `409`, e.g. mismatched `expected_epoch`. |
+| `GuardUnavailableError` | `GUARD_UNAVAILABLE` | Guard unreachable. Fail-closed. |
+| `GuardConfigError` | `GUARD_CONFIG` | Configuration that would weaken guarantees. |
+| `GuardStateInvalidError` | `GUARD_STATE_INVALID` | Kill switch state too stale. |
 
-## Garanzie
+## Guarantees
 
-1. Un verdetto non riconosciuto **non autorizza** (allow-list positiva, fail-closed).
-2. `wrap()` copre ogni metodo: l'errore per omissione e' chiuso.
-3. `PAUSED` blocca qualunque cosa faccia l'hook.
-4. Il timeout copre anche la lettura del corpo e non dipende dal `signal` di `fetch`.
-5. `402`, `401`, `403`, `409` sono terminali: mai ritentati.
-6. La chiave API non compare in URL, corpo o log.
-7. Un halt arrivato durante la valutazione ferma comunque l'azione (anti-TOCTOU).
+1. An unrecognized verdict **does not authorize** (positive allow-list, fail-closed).
+2. `wrap()` covers every method: the error for omission is closed.
+3. `PAUSED` blocks whatever the hook does.
+4. The timeout covers body reads too and does not depend on `fetch`'s `signal`.
+5. `402`, `401`, `403`, `409` are terminal: never retried.
+6. The API key never appears in URLs, bodies, or logs.
+7. A halt arriving during evaluation still stops the action (anti-TOCTOU).
 
-## Licenza
+## License
 
 MIT
