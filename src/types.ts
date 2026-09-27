@@ -1,33 +1,33 @@
 /**
- * Descrittore dell'azione inviata a /api/v1/evaluate.
+ * Descriptor of the action sent to /api/v1/evaluate.
  *
- * Deriva dal `types.d.ts` pubblicato della 0.1.2: e' la forma REALE, non quella che sarebbe
- * piaciuta. Durante la stesura del contratto v17 e' emerso proprio questo: il descrittore e'
+ * Derives from the published `types.d.ts` of 0.1.2: it is the REAL shape, not the one we would
+ * have liked. While drafting contract v17 this is exactly what emerged: the descriptor is
  * { type, target, domain, amount, currency, recipients, query, direction, external, metadata }
- * e non { name, resource, params }. Uno schema si ricava dall'artefatto, non dall'intenzione.
+ * and not { name, resource, params }. A schema is derived from the artifact, not from intent.
  */
 export interface GuardAction {
-  /** Tipo dell'azione, es. `payment`, `email.send`, `db.delete`. Obbligatorio. */
+  /** Action type, e.g. `payment`, `email.send`, `db.delete`. Required. */
   type: string;
-  /** Bersaglio dell'azione (risorsa, tabella, endpoint). */
+  /** Action target (resource, table, endpoint). */
   target?: string;
-  /** Dominio di rete, se l'azione esce verso Internet. */
+  /** Network domain, if the action goes out to the Internet. */
   domain?: string;
-  /** Importo, per le azioni finanziarie. */
+  /** Amount, for financial actions. */
   amount?: number;
-  /** Valuta ISO-4217, es. `EUR`. */
+  /** ISO-4217 currency, e.g. `EUR`. */
   currency?: string;
-  /** Numero di destinatari, per invii massivi. */
+  /** Number of recipients, for bulk sends. */
   recipients?: number;
-  /** Query, per letture dati. */
+  /** Query, for data reads. */
   query?: string;
-  /** Direzione del flusso, per movimenti di denaro o dati. */
+  /** Flow direction, for money or data movements. */
   direction?: 'inbound' | 'outbound';
-  /** true quando l'azione supera il confine del tenant. */
+  /** true when the action crosses the tenant boundary. */
   external?: boolean;
   /**
-   * Metadati non sensibili. ATTENZIONE: non metterci PII o segreti. Il SDK allega la propria
-   * `args_digest`; gli argomenti grezzi non vengono mai serializzati nel payload.
+   * Non-sensitive metadata. WARNING: do not put PII or secrets here. The SDK attaches its own
+   * `args_digest`; raw arguments are never serialized in the payload.
    */
   metadata?: Record<string, unknown>;
 }
