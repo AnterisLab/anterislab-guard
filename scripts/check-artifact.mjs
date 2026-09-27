@@ -1,11 +1,12 @@
-// Verifica artefatto == sorgente.
+
+// Artifact == source verification.
 //
-// Perche' esiste: la 0.1.1 pubblicata su npm NON era la build del sorgente (SHA-256 divergenti,
-// mancava del tutto la gestione del 402). Chi installava dal registro riceveva un codice diverso
-// da quello revisionato. Questo script costruisce da zero, confronta e fallisce se i byte
-// differiscono: e' il cancello che rende dimostrabile la corrispondenza artefatto/sorgente.
+// Why this exists: the 0.1.1 published on npm was NOT the build of the source (diverging SHA-256,
+// the 402 handling was entirely missing). Anyone installing from the registry received code
+// different from what had been reviewed. This script builds from scratch, compares, and fails if
+// the bytes differ: it is the gate that makes the artifact/source correspondence demonstrable.
 //
-// Uso: node scripts/check-artifact.mjs      (esce 0 se coerente, 1 altrimenti)
+// Usage: node scripts/check-artifact.mjs      (exits 0 if coherent, 1 otherwise)
 
 import { createHash } from 'node:crypto';
 import { execSync } from 'node:child_process';
@@ -20,51 +21,45 @@ function sha256(path) {
 }
 
 function fail(message) {
-  console.error(`[check-artifact] FALLITO: ${message}`);
+  console.error(`[check-artifact] FAILED: ${message}`);
   process.exit(1);
 }
 
-if (!existsSync(join(root, 'dist'))) fail('dist/ assente: esegui prima `npm run build`');
+if (!existsSync(join(root, 'dist'))) fail('dist/ missing: run `npm run build` first');
 
-// 1. Le tre uscite dichiarate in package.json devono esistere.
+// 1. The three outputs declared in package.json must exist.
 const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-if (manifest.main !== './dist/index.js') fail(`main inatteso: ${manifest.main}`);
-if (manifest.types !== './dist/index.d.ts') fail(`types inattesi: ${manifest.types}`);
+if (manifest.main !== './dist/index.js') fail(`unexpected main: ${manifest.main}`);
+if (manifest.types !== './dist/index.d.ts') fail(`unexpected types: ${manifest.types}`);
 for (const file of required) {
-  if (!existsSync(join(root, file))) fail(`file pubblicato mancante: ${file}`);
+  if (!existsSync(join(root, file))) fail(`published file missing: ${file}`);
 }
-if (!manifest.files.includes('LICENSE')) fail('LICENSE non e\' nell\'elenco dei file pubblicati');
+if (!manifest.files.includes('LICENSE')) fail('LICENSE is not in the list of published files');
 
-// 2. Il build deve essere riproducibile: ricostruisci in una cartella pulita e confronta i byte.
+// 2. The build must be reproducible: rebuild in a clean folder and compare the bytes.
 const before = Object.fromEntries(required.map((f) => [f, sha256(join(root, f))]));
 rmSync(join(root, 'dist'), { recursive: true, force: true });
 try {
   execSync('npx tsc --project tsconfig.json', { cwd: root, stdio: 'inherit' });
 } catch {
-  fail('la ricostruzione da zero non e\' riuscita');
+  fail('the rebuild from scratch did not succeed');
 }
 for (const file of required) {
   const after = sha256(join(root, file));
   if (after !== before[file]) {
-    fail(`artefatto != sorgente per ${file}: ${before[file].slice(0, 12)} != ${after.slice(0, 12)}`);
+    fail(`artifact != source for ${file}: ${before[file].slice(0, 12)} != ${after.slice(0, 12)}`);
   }
 }
 
-// 3. Il codice pubblicato deve contenere la logica di quota (il difetto C-01 della 0.1.1) e
-//    l'allow-list positiva dei verdetti.
+// 3. The published code must contain the quota logic (the C-01 defect of 0.1.1) and the positive
+//    allow-list of verdicts.
 //
-//    NOTA (imparata sulla mia pelle): la prima versione leggeva solo il PRIMO file e cercava
-//    `GUARD_QUOTA_EXCEEDED` li' dentro. Ma `tsc` emette un file per modulo: stringhe e simboli si
-//    trovano nel file del modulo che li definisce (`errors.js`, `verdict.js`), non necessariamente
-//    in `index.js`. Il cancello falliva su un pacchetto corretto — un falso allarme che, in CI,
-//    avrebbe bloccato ogni release. Un controllo di contenuto va fatto su TUTTO l'insieme dei file
-//    pubblicati, non su un file rappresentativo scelto a caso.
-const published = required
-  .filter((file) => file.endsWith('.js') || file.endsWith('.d.ts'))
-  .map((file) => readFileSync(join(root, file), 'utf8'))
-  .join('\n');
-
-// Le stringhe possono vivere in qualunque modulo emesso: si legge l'intera cartella dist.
+//    NOTE (learned the hard way): the first version read only the FIRST file and looked for
+//    `GUARD_QUOTA_EXCEEDED` inside it. But `tsc` emits one file per module: strings and symbols
+//    live in the file of the module that defines them (`errors.js`, `verdict.js`), not necessarily
+//    in `index.js`. The gate failed on a correct package -- a false alarm that, in CI, would have
+//    blocked every release. A content check must run on the ENTIRE set of published files, not on
+//    a representative file chosen at random.
 function readDistBundle() {
   const parts = [];
   const walk = (dir) => {
@@ -80,16 +75,16 @@ function readDistBundle() {
 
 const bundle = readDistBundle();
 if (!bundle.includes('GUARD_QUOTA_EXCEEDED')) {
-  fail('dist/ non contiene la gestione del 402 (GuardQuotaError): artefatto vecchio o parziale');
+  fail('dist/ does not contain the 402 handling (GuardQuotaError): stale or partial artifact');
 }
 if (!bundle.includes('AUTHORIZING_VERDICTS')) {
-  fail('dist/ non contiene l\'allow-list positiva dei verdetti (AUTHORIZING_VERDICTS): ricerca del fail-open');
+  fail('dist/ does not contain the positive allow-list of verdicts (AUTHORIZING_VERDICTS): fail-open hunt');
 }
 if (!bundle.includes('GUARD_BLOCKED')) {
-  fail('dist/ non contiene il diniego per corpi di risposta non riconosciuti');
+  fail('dist/ does not contain the denial for unrecognized response bodies');
 }
 
-console.log('[check-artifact] OK: artefatto coerente con il sorgente, quota e allow-list presenti');
+console.log('[check-artifact] OK: artifact coherent with source, quota and allow-list present');
 for (const [file, hash] of Object.entries(before)) {
   console.log(`  ${hash.slice(0, 16)}  ${file}`);
 }
