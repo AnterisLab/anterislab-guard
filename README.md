@@ -78,6 +78,24 @@ new Guard({ apiKey, verifyVerdict: process.env.ANTERISLAB_VERDICT_SECRET });
 When `verifyVerdict` is configured, an unsigned positive verdict is **rejected**. The signature
 covers the exact response body.
 
+## Testing without a subscription
+
+Development and tests do not need a subscription or a live control plane. Import the
+public mock from the `/mock` subpath:
+
+```js
+import { Guard } from '@anterislab/guard';
+import { createMockFetch, approvedVerdict, blockedVerdict } from '@anterislab/guard/mock';
+
+const mock = createMockFetch({ status: 200, body: approvedVerdict() });
+const guard = new Guard({ apiKey: 'test-key', fetchImpl: mock.fetch });
+
+// ... run your guarded code ...
+
+mock.evaluateCalls;   // number of calls to /api/v1/evaluate
+mock.calls;           // full request log (url, method, headers, body)
+mock.reset();         // clear the log and restart the responder sequence
+
 ## Options
 
 | Option | Default | Description |
