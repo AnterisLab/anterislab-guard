@@ -1,24 +1,25 @@
+
 #!/usr/bin/env bash
-# Variabili d'ambiente condivise: dove sta la sessione, su quale porta parla il server.
+# Shared environment variables: where the session lives, on which port the server speaks.
 #
-# Perche' esiste: la guida usava `/tmp/ck.txt` come percorso del file dei cookie. Su Termux
-# `/tmp` NON esiste, e curl non lo crea: `curl -c /tmp/ck.txt` fallisce IN SILENZIO (nessun
-# errore, nessun avviso, exit 0) e il file non viene mai scritto. Il login risponde
-# `{"ok":true}` e sembra riuscito; il comando successivo risponde
-# `{"error":{"code":"unauthenticated","message":"sessione assente o scaduta"}}`.
-# E' il difetto D12. Questo file e' la contromisura: un percorso di stato che ESISTE DAVVERO,
-# scelto provandolo, mai assunto.
+# Why this exists: the guide used `/tmp/ck.txt` as the cookie file path. On Termux
+# `/tmp` does NOT exist, and curl does not create it: `curl -c /tmp/ck.txt` fails SILENTLY
+# (no error, no warning, exit 0) and the file is never written. The login responds
+# `{"ok":true}` and looks successful; the next command responds
+# `{"error":{"code":"unauthenticated","message":"session missing or expired"}}`.
+# This is defect D12. This file is the countermeasure: a state path that REALLY EXISTS,
+# chosen by trying it, never assumed.
 #
-# Uso, da un terminale nella cartella del kit:
+# Usage, from a terminal inside the kit folder:
 #
 #     source scripts/anterislab-env.sh
 #
-# Dopo il `source` sono disponibili `$BASE`, `$CK` e i comandi `session-login`, `session-check`,
-# `api`. Le variabili sono esportate: valgono anche negli incollaggi successivi della STESSA
-# sessione di terminale. Se apri un terminale nuovo, ripeti il `source`.
+# After the `source`, `$BASE`, `$CK` and the commands `session-login`, `session-check`,
+# `api` are available. The variables are exported: they also hold for subsequent pastes in
+# the SAME terminal session. If you open a new terminal, repeat the `source`.
 
-# --- Porta e host del control plane ---------------------------------------
-# `ANTERISLAB_PORT` ha priorita'; il default e' 8787, lo stesso di scripts/dev.sh.
+# --- Control-plane port and host ------------------------------------------
+# `ANTERISLAB_PORT` takes priority; the default is 8787, the same as scripts/dev.sh.
 if [ -z "${ANTERISLAB_PORT:-}" ] && [ -f .env ]; then
   ANTERISLAB_PORT="$(sed -n 's/^ANTERISLAB_PORT=\(.*\)$/\1/p' .env | tail -n 1)"
 fi
@@ -26,22 +27,22 @@ ANTERISLAB_PORT="${ANTERISLAB_PORT:-8787}"
 export ANTERISLAB_PORT
 export BASE="${BASE:-http://127.0.0.1:${ANTERISLAB_PORT}}"
 
-# --- Cartella di stato -----------------------------------------------------
-# Ordine di preferenza:
-#   1. ANTERISLAB_STATE_DIR, se l'utente l'ha impostata
-#   2. $HOME/.anterislab   <- il default, e l'unico che funziona identico su Linux, macOS e Termux
-#   3. $TMPDIR/anterislab  <- Termux/Android: la cartella temporanea vera
-#   4. /tmp/anterislab     <- ultima spiaggia, solo dove /tmp esiste
+# --- State folder ----------------------------------------------------------
+# Preference order:
+#   1. ANTERISLAB_STATE_DIR, if the user has set it
+#   2. $HOME/.anterislab   <- the default, and the only one that behaves identically on Linux, macOS and Termux
+#   3. $TMPDIR/anterislab  <- Termux/Android: the real temporary folder
+#   4. /tmp/anterislab     <- last resort, only where /tmp exists
 #
-# Il candidato viene ACCETTATO solo se ci si riesce davvero a scrivere un file: la verifica
-# e' una scrittura reale, non un `test -d`. Su Android `test -w` puo' mentire.
+# A candidate is ACCEPTED only if we can actually write a file into it: the check
+# is a real write, not a `test -d`. On Android `test -w` can lie.
 _anterislab_pick_state_dir() {
   local candidate
   for candidate in "${ANTERISLAB_STATE_DIR:-}" "$HOME/.anterislab" "${TMPDIR:-}/anterislab" "/tmp/anterislab"; do
     [ -n "$candidate" ] || continue
     mkdir -p "$candidate" 2>/dev/null || continue
-    if { : > "$candidate/.scrivi-prova"; } 2>/dev/null; then
-      rm -f "$candidate/.scrivi-prova" 2>/dev/null
+    if { : > "$candidate/.write-test"; } 2>/dev/null; then
+      rm -f "$candidate/.write-test" 2>/dev/null
       printf '%s' "$candidate"
       return 0
     fi
@@ -50,23 +51,24 @@ _anterislab_pick_state_dir() {
 }
 
 if ! ANTERISLAB_STATE_DIR="$(_anterislab_pick_state_dir)"; then
-  printf '\033[1;31m[x]\033[0m Nessuna cartella scrivibile per la sessione.\n' >&2
-  printf '    Prova:  export ANTERISLAB_STATE_DIR="$HOME/anterislab-stato" && mkdir -p "$ANTERISLAB_STATE_DIR"\n' >&2
+  printf '\033[1;31m[x]\033[0m No writable folder for the session.\n' >&2
+  printf '    Try:  export ANTERISLAB_STATE_DIR="$HOME/anterislab-state" && mkdir -p "$ANTERISLAB_STATE_DIR"\n' >&2
   return 1 2>/dev/null || exit 1
 fi
 export ANTERISLAB_STATE_DIR
 
-# --- File dei cookie -------------------------------------------------------
+# --- Cookie file -----------------------------------------------------------
 export CK="${CK:-$ANTERISLAB_STATE_DIR/cookie.txt}"
 
 printf '\033[1;36m==>\033[0m Control plane:     %s\n' "$BASE"
-printf '\033[1;36m==>\033[0m Cartella di stato: %s\n' "$ANTERISLAB_STATE_DIR"
-printf '\033[1;36m==>\033[0m File di sessione:  %s\n' "$CK"
+printf '\033[1;36m==>\033[0m State folder:      %s\n' "$ANTERISLAB_STATE_DIR"
+printf '\033[1;36m==>\033[0m Session file:      %s\n' "$CK"
 
-# --- Comandi di comodo -----------------------------------------------------
+# --- Convenience commands --------------------------------------------------
 
-# Apre la sessione e VERIFICA che il cookie sia stato scritto davvero.
-# E' la differenza che conta rispetto a un `curl -c` nudo: qui il silenzio di curl non inganna.
+# Opens the session and VERIFIES that the cookie was actually written.
+# This is the difference that matters compared to a bare `curl -c`: here the silence of curl
+# does not fool you.
 session-login() {
   local password="${1:-${ANTERISLAB_DASHBOARD_PASSWORD:-anterislab-dev}}"
   local body
@@ -76,38 +78,38 @@ session-login() {
     -d "{\"password\":\"$password\"}") " || return 1
   printf '%s\n' "$body"
   if [ ! -s "$CK" ]; then
-    printf '\033[1;31m[x]\033[0m Il server ha risposto, ma il file di sessione NON e stato scritto: %s\n' "$CK" >&2
-    printf '    Causa tipica: la cartella non esiste o non e scrivibile (su Termux /tmp non esiste).\n' >&2
-    printf '    Diagnosi: bash scripts/doctor.sh\n' >&2
+    printf '\033[1;31m[x]\033[0m The server responded, but the session file was NOT written: %s\n' "$CK" >&2
+    printf '    Typical cause: the folder does not exist or is not writable (on Termux /tmp does not exist).\n' >&2
+    printf '    Diagnosis: bash scripts/doctor.sh\n' >&2
     return 1
   fi
   if ! grep -q 'anterislab_sess' "$CK"; then
-    printf '\033[1;31m[x]\033[0m Il file di sessione esiste ma non contiene il cookie di accesso.\n' >&2
-    printf '    Causa tipica: password errata (la risposta sopra lo dice), oppure un proxy che rimuove Set-Cookie.\n' >&2
+    printf '\033[1;31m[x]\033[0m The session file exists but does not contain the access cookie.\n' >&2
+    printf '    Typical cause: wrong password (the response above says so), or a proxy stripping Set-Cookie.\n' >&2
     return 1
   fi
-  printf '\033[1;32m[v]\033[0m Sessione aperta e salvata in %s\n' "$CK"
+  printf '\033[1;32m[v]\033[0m Session opened and saved in %s\n' "$CK"
 }
 
-# Mostra se il file di sessione esiste e se il cookie e' ancora valido.
+# Shows whether the session file exists and whether the cookie is still valid.
 session-check() {
   if [ ! -s "$CK" ]; then
-    printf '\033[1;31m[x]\033[0m Nessun file di sessione in %s\n' "$CK" >&2
-    printf '    Fai prima: session-login\n' >&2
+    printf '\033[1;31m[x]\033[0m No session file in %s\n' "$CK" >&2
+    printf '    Run first: session-login\n' >&2
     return 1
   fi
   local code
   code="$(curl -s -o /dev/null -w '%{http_code}' -b "$CK" "$BASE/api/v1/dashboard/summary?tenant=demo-tenant")"
   if [ "$code" = '200' ]; then
-    printf '\033[1;32m[v]\033[0m Sessione valida (HTTP %s)\n' "$code"
+    printf '\033[1;32m[v]\033[0m Valid session (HTTP %s)\n' "$code"
   else
-    printf '\033[1;31m[x]\033[0m Sessione NON valida (HTTP %s)\n' "$code" >&2
-    printf '    Fai di nuovo: session-login\n' >&2
+    printf '\033[1;31m[x]\033[0m INVALID session (HTTP %s)\n' "$code" >&2
+    printf '    Run again: session-login\n' >&2
     return 1
   fi
 }
 
-# Chiamata autenticata, con il cookie SEMPRE allegato.
+# Authenticated call, with the cookie ALWAYS attached.
 api() {
   curl -s -b "$CK" "$BASE$1"
 }
