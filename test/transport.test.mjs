@@ -1,7 +1,7 @@
 /**
- * Trasporto: timeout, retry, quota, rate limit, idempotenza.
- * Qui vive il difetto A-05/M-02 della 0.1.1: Retry-After ignorato e timeout che non copriva
- * la lettura del corpo.
+ * Transport: timeout, retry, quota, rate limit, idempotency.
+ * Here lives the 0.1.1 defect A-05/M-02: Retry-After ignored and a timeout that did not cover
+ * body reads.
  */
 
 import assert from 'node:assert/strict';
@@ -17,7 +17,7 @@ const BASE = {
   allowedHosts: ['127.0.0.1'],
 };
 
-/** fetch che risponde con una sequenza di esiti e registra gli header di ogni tentativo. */
+/** fetch that responds with a sequence of outcomes and records the headers of every attempt. */
 function sequencedFetch(steps) {
   let index = 0;
   const seen = [];
@@ -41,26 +41,26 @@ function agentFor(guard) {
   return { safe, effects };
 }
 
-// --- 402: la quota e' una barriera, con qualunque impostazione di failOpen ---
+// --- 402: quota is a barrier, regardless of the failOpen setting ---
 for (const failOpen of [false, true]) {
-  test(`402 SUPPORTA la quota come barriera (failOpen=${failOpen})`, async () => {
+  test(`402 holds quota as a barrier (failOpen=${failOpen})`, async () => {
     const { impl, seen } = sequencedFetch([{ status: 402, body: { code: 'quota_exceeded', plan: 'starter', limit: 500, used: 500 } }]);
     const guard = new Guard({ ...BASE, fetchImpl: impl, failOpen, retries: 2 });
     const { safe, effects } = agentFor(guard);
 
     await assert.rejects(() => safe(10), GuardQuotaError);
-    assert.deepEqual(effects, [], 'nessun effetto: il 402 non si aggira');
-    assert.equal(seen.length, 1, 'il 402 e terminale: nessun retry');
+    assert.deepEqual(effects, [], 'no effect: the 402 is not bypassed');
+    assert.equal(seen.length, 1, 'the 402 is terminal: no retry');
   });
 }
 
-test('402 espone piano, limite e consumo', async () => {
+test('402 exposes plan, limit and usage', async () => {
   const { impl } = sequencedFetch([{ status: 402, body: { error: 'quota_exceeded', plan: 'pro', limit: 5000, used: 5000 } }]);
   const guard = new Guard({ ...BASE, fetchImpl: impl });
   const { safe } = agentFor(guard);
   try {
     await safe(10);
-    assert.fail('atteso GuardQuotaError');
+    assert.fail('expected GuardQuotaError');
   } catch (error) {
     assert.ok(error instanceof GuardQuotaError);
     assert.equal(error.plan, 'pro');
@@ -69,8 +69,8 @@ test('402 espone piano, limite e consumo', async () => {
   }
 });
 
-// --- 401/403: terminali, mai ritentati ---
-test('401 e terminale e non viene ritentato', async () => {
+// --- 401/403: terminal, never retried ---
+test('401 is terminal and is not retried', async () => {
   const { impl, seen } = sequencedFetch([{ status: 401, body: { code: 'invalid_api_key' } }]);
   const guard = new Guard({ ...BASE, fetchImpl: impl, retries: 3 });
   const { safe, effects } = agentFor(guard);
@@ -79,7 +79,7 @@ test('401 e terminale e non viene ritentato', async () => {
   assert.deepEqual(effects, []);
 });
 
-test('403 agent_not_in_scope e terminale', async () => {
+test('403 agent_not_in_scope is terminal', async () => {
   const { impl, seen } = sequencedFetch([{ status: 403, body: { code: 'agent_not_in_scope' } }]);
   const guard = new Guard({ ...BASE, fetchImpl: impl, retries: 3 });
   const { safe, effects } = agentFor(guard);
@@ -88,8 +88,8 @@ test('403 agent_not_in_scope e terminale', async () => {
   assert.deepEqual(effects, []);
 });
 
-// --- 429: si attende il Retry-After dichiarato, non lo si ignora ---
-test('429 con Retry-After breve viene atteso e poi rieseguito', async () => {
+// --- 429: the declared Retry-After is honored, not ignored ---
+test('429 with a short Retry-After is waited for and then retried', async () => {
   const { impl, seen } = sequencedFetch([
     { status: 429, headers: { 'retry-after': '0' }, body: { code: 'rate_limited' } },
     { status: 200, body: approved() },
@@ -97,20 +97,20 @@ test('429 con Retry-After breve viene atteso e poi rieseguito', async () => {
   const guard = new Guard({ ...BASE, fetchImpl: impl, retries: 1 });
   const { safe, effects } = agentFor(guard);
   await safe(10);
-  assert.equal(seen.length, 2, 'ha ritentato dopo il 429');
+  assert.equal(seen.length, 2, 'retried after the 429');
   assert.deepEqual(effects, ['charge:10']);
 });
 
-test('429 con Retry-After oltre il budget non viene aggirato: fail-closed', async () => {
+test('429 with a Retry-After beyond the budget is not bypassed: fail-closed', async () => {
   const { impl, seen } = sequencedFetch([{ status: 429, headers: { 'retry-after': '9999' }, body: { code: 'rate_limited' } }]);
   const guard = new Guard({ ...BASE, fetchImpl: impl, retries: 5, maxRetryAfterMs: 1000 });
   const { safe, effects } = agentFor(guard);
   await assert.rejects(() => safe(10), GuardUnavailableError);
-  assert.equal(seen.length, 1, 'non ha tentato di nuovo subito');
+  assert.equal(seen.length, 1, 'did not try again immediately');
   assert.deepEqual(effects, []);
 });
 
-test('429 senza Retry-After non viene interpretato: rifiuto', async () => {
+test('429 without Retry-After is not interpreted: rejection', async () => {
   const { impl } = sequencedFetch([{ status: 429, body: { code: 'rate_limited' } }]);
   const guard = new Guard({ ...BASE, fetchImpl: impl, retries: 3 });
   const { safe, effects } = agentFor(guard);
@@ -118,8 +118,8 @@ test('429 senza Retry-After non viene interpretato: rifiuto', async () => {
   assert.deepEqual(effects, []);
 });
 
-// --- 5xx: ritentato entro budget, poi fail-closed ---
-test('5xx viene ritentato e poi riesce', async () => {
+// --- 5xx: retried within the budget, then fail-closed ---
+test('5xx is retried and then succeeds', async () => {
   const { impl, seen } = sequencedFetch([{ status: 503, body: { code: 'guard_unavailable' } }, { status: 200, body: approved() }]);
   const guard = new Guard({ ...BASE, fetchImpl: impl, retries: 2 });
   const { safe, effects } = agentFor(guard);
@@ -128,7 +128,7 @@ test('5xx viene ritentato e poi riesce', async () => {
   assert.deepEqual(effects, ['charge:10']);
 });
 
-test('5xx persistente produce fail-closed (non fail-open)', async () => {
+test('persistent 5xx produces fail-closed (not fail-open)', async () => {
   const { impl } = sequencedFetch([{ status: 500, body: { code: 'internal_error' } }]);
   const guard = new Guard({ ...BASE, fetchImpl: impl, retries: 2 });
   const { safe, effects } = agentFor(guard);
@@ -136,7 +136,7 @@ test('5xx persistente produce fail-closed (non fail-open)', async () => {
   assert.deepEqual(effects, []);
 });
 
-test('failOpen: true prosegue ma NON registra mai APPROVED reale', async () => {
+test('failOpen: true proceeds but NEVER records a real APPROVED', async () => {
   const { impl } = sequencedFetch([{ status: 500, body: { code: 'internal_error' } }]);
   const decisions = [];
   const guard = new Guard({
@@ -153,18 +153,18 @@ test('failOpen: true prosegue ma NON registra mai APPROVED reale', async () => {
   assert.match(decisions[0].reason, /fail-open/i);
 });
 
-// --- Idempotenza: stessa chiave su ogni tentativo, quota consumata una volta ---
-test('l\'Idempotency-Key e riusata identica su ogni retry', async () => {
+// --- Idempotency: same key on every attempt, quota consumed once ---
+test('the Idempotency-Key is reused identically on every retry', async () => {
   const { impl, seen } = sequencedFetch([{ status: 503 }, { status: 200, body: approved() }]);
   const guard = new Guard({ ...BASE, fetchImpl: impl, retries: 2 });
   const { safe } = agentFor(guard);
   await safe(10);
   assert.equal(seen.length, 2);
-  assert.ok(seen[0].idempotencyKey, 'la chiave e presente');
-  assert.equal(seen[0].idempotencyKey, seen[1].idempotencyKey, 'stessa chiave sui due tentativi');
+  assert.ok(seen[0].idempotencyKey, 'the key is present');
+  assert.equal(seen[0].idempotencyKey, seen[1].idempotencyKey, 'same key on both attempts');
 });
 
-test('due azioni diverse usano due chiavi diverse', async () => {
+test('two different actions use two different keys', async () => {
   const { impl, seen } = sequencedFetch([{ status: 200, body: approved() }]);
   const guard = new Guard({ ...BASE, fetchImpl: impl });
   const { safe } = agentFor(guard);
@@ -173,23 +173,23 @@ test('due azioni diverse usano due chiavi diverse', async () => {
   assert.notEqual(seen[0].idempotencyKey, seen[1].idempotencyKey);
 });
 
-test('la chiave API non compare mai nell\'URL', async () => {
+test('the API key never appears in the URL', async () => {
   const { impl, seen } = sequencedFetch([{ status: 200, body: approved() }]);
   const guard = new Guard({ ...BASE, fetchImpl: impl });
   const { safe } = agentFor(guard);
   await safe(10);
-  assert.ok(!seen[0].url.includes(BASE.apiKey), 'la chiave non e nell URL');
-  assert.ok(seen[0].authorization.startsWith('Bearer '), 'la chiave viaggia solo nell header Authorization');
+  assert.ok(!seen[0].url.includes(BASE.apiKey), 'the key is not in the URL');
+  assert.ok(seen[0].authorization.startsWith('Bearer '), 'the key travels only in the Authorization header');
 });
 
-// --- Timeout: copre anche la lettura del corpo (difetto M-02) ---
-test('timeout che scade durante la lettura del corpo produce fail-closed', async () => {
-  // Header immediati, corpo che non arriva mai: e' il caso che la 0.1.1 non copriva.
+// --- Timeout: covers body reads too (defect M-02) ---
+test('timeout expiring during the body read produces fail-closed', async () => {
+  // Immediate headers, a body that never arrives: this is the case 0.1.1 did not cover.
   const impl = async () => {
     const stream = new ReadableStream({
       start(controller) {
         setTimeout(() => {
-          try { controller.enqueue(new TextEncoder().encode(JSON.stringify(approved()))); controller.close(); } catch { /* gia chiuso */ }
+          try { controller.enqueue(new TextEncoder().encode(JSON.stringify(approved()))); controller.close(); } catch { /* already closed */ }
         }, 2000);
       },
     });
@@ -201,7 +201,7 @@ test('timeout che scade durante la lettura del corpo produce fail-closed', async
   assert.deepEqual(effects, []);
 });
 
-test('una risposta enorme viene rifiutata invece che elaborata', async () => {
+test('a huge response is rejected instead of being processed', async () => {
   const huge = JSON.stringify({ decision: 'APPROVED', padding: 'x'.repeat(300_000) });
   const impl = async () => new Response(huge, { status: 200, headers: { 'content-type': 'application/json' } });
   const guard = new Guard({ ...BASE, fetchImpl: /** @type {typeof fetch} */ (impl), retries: 0 });
@@ -210,7 +210,7 @@ test('una risposta enorme viene rifiutata invece che elaborata', async () => {
   assert.deepEqual(effects, []);
 });
 
-test('se la risposta echosse la chiave API, viene rifiutata', async () => {
+test('if the response echoes the API key, it is rejected', async () => {
   const impl = async () => new Response(`{"decision":"APPROVED","leak":"${BASE.apiKey}"}`, { status: 200 });
   const guard = new Guard({ ...BASE, fetchImpl: /** @type {typeof fetch} */ (impl), retries: 0 });
   const { safe, effects } = agentFor(guard);
