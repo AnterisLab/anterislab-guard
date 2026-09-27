@@ -138,7 +138,7 @@ export class Guard {
 
   constructor(options: GuardOptions) {
     if (!options?.apiKey || options.apiKey.trim().length === 0) {
-      throw new GuardConfigError('apiKey e\' obbligatoria');
+      throw new GuardConfigError('apiKey is required');
     }
 
     const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
@@ -147,25 +147,25 @@ export class Guard {
     try {
       parsed = new URL(baseUrl);
     } catch {
-      throw new GuardConfigError('baseUrl non e\' un URL valido: ' + baseUrl);
+      throw new GuardConfigError('baseUrl is not a valid URL: ' + baseUrl);
     }
 
     if (parsed.protocol !== 'https:') {
       const permittedLoopback = options.allowInsecureHttp === true && isLoopbackHost(parsed.hostname);
       if (!permittedLoopback) {
         throw new GuardConfigError(
-          'baseUrl deve usare https (ricevuto ' + parsed.protocol + '//' + parsed.hostname + '). ' +
-            'La chiave API viaggerebbe in chiaro. Per lo sviluppo locale usa allowInsecureHttp: true su loopback.',
+          'baseUrl must use https (received ' + parsed.protocol + '//' + parsed.hostname + '). ' +
+            'The API key would travel in cleartext. For local development use allowInsecureHttp: true on loopback.',
         );
       }
     }
     if (!allowedHosts.includes(parsed.hostname)) {
       throw new GuardConfigError(
-        'host "' + parsed.hostname + '" non e\' in allowedHosts [' + allowedHosts.join(', ') + ']: la chiave non viene inviata a un host non previsto',
+        'host "' + parsed.hostname + '" is not in allowedHosts [' + allowedHosts.join(', ') + ']: the key is not sent to an unexpected host',
       );
     }
     if (options.expectedAgent !== undefined && options.expectedAgent.trim().length === 0) {
-      throw new GuardConfigError('expectedAgent se fornito deve essere non vuoto');
+      throw new GuardConfigError('expectedAgent, when provided, must be non-empty');
     }
 
     this.options = {
@@ -197,7 +197,7 @@ export class Guard {
 
     if (typeof options.verifyVerdict === 'string') {
       const secret = options.verifyVerdict;
-      if (secret.length < 16) throw new GuardConfigError('il segreto di verifica deve avere almeno 16 caratteri');
+      if (secret.length < 16) throw new GuardConfigError('the verification secret must be at least 16 characters long');
       this.verify = (rawBody, signature) => this.verifyHmac(secret, rawBody, signature);
     } else if (typeof options.verifyVerdict === 'function') {
       this.verify = options.verifyVerdict;
@@ -307,7 +307,7 @@ export class Guard {
         if (error instanceof GuardUnavailableError && this.options.failOpen) {
           const failOpenDecision: ParsedDecision = {
             decision: 'APPROVED',
-            reason: 'fail-open esplicito: ' + error.message,
+            reason: 'explicit fail-open: ' + error.message,
             policy: null,
             decisionId: null,
             latencyMs: null,
@@ -318,7 +318,7 @@ export class Guard {
         }
         throw error;
       }
-      throw new GuardUnavailableError('valutazione non riuscita: ' + (error as Error).message);
+      throw new GuardUnavailableError('evaluation failed: ' + (error as Error).message);
     }
 
     // 2. Positive allow-list. An unparseable body is a denial, not an exception.
@@ -334,7 +334,7 @@ export class Guard {
       const valid = this.verify(outcome.rawBody, signature);
       if (!valid) {
         throw new GuardBlockedError(
-          'verdetto non firmato o con firma non valida: rifiutato perche non autentico',
+          'unsigned verdict or invalid signature: rejected as unauthentic',
           decision.policy,
           decision.decisionId,
         );
@@ -379,10 +379,10 @@ export class Guard {
   }
 
   private assertAgent(agent: string): void {
-    if (!agent || agent.trim().length === 0) throw new GuardConfigError('il nome dell agente e\' obbligatorio');
+    if (!agent || agent.trim().length === 0) throw new GuardConfigError('the agent name is required');
     if (this.expectedAgent && agent !== this.expectedAgent) {
       throw new GuardBlockedError(
-        'questo client e\' vincolato all agente "' + this.expectedAgent + '" ma e\' stata richiesta l\'azione per "' + agent + '"',
+        'this client is pinned to agent "' + this.expectedAgent + '" but the action was requested for "' + agent + '"',
         null,
         null,
       );
@@ -400,7 +400,7 @@ export class Guard {
         throw new GuardHaltedError(error.details.reason, origin, error.details.epoch);
       }
       if (error instanceof KillSwitchStaleError) {
-        throw new GuardStateInvalidError('stato del kill switch troppo vecchio: ' + error.message);
+        throw new GuardStateInvalidError('kill switch state too stale: ' + error.message);
       }
       if (error instanceof KillSwitchUnavailableError) {
         throw new GuardUnavailableError(error.message);
@@ -412,7 +412,7 @@ export class Guard {
   private requireKillSwitch(): KillSwitchManager {
     if (!this.killSwitch) {
       throw new GuardConfigError(
-        'il kill switch non e\' configurato su questo Guard: passa killSwitch: { tenant, agent } al costruttore',
+        'the kill switch is not configured on this Guard: pass killSwitch: { tenant, agent } to the constructor',
       );
     }
     return this.killSwitch;
