@@ -45,6 +45,7 @@
     "prepublishOnly": "npm run build && npm run check:artifact"
   },
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
     "@types/node": "^20.19.43",
     "typescript": "^5.9.3"
   },
