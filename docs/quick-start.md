@@ -7,7 +7,7 @@ mock for local development and tests.
 
 ## Requirements
 
-- Node.js 18 or later.
+- Node.js 20 or later.
 - npm, pnpm, or yarn.
 
 AnterisLab Guard has zero runtime dependencies.
