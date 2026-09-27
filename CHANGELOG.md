@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `@anterislab/guard/mock` subpath export: a zero-dependency mock `fetch` for
+  tests and local development without a subscription. Includes
+  `createMockFetch`, canonical verdict builders (`approvedVerdict`,
+  `flaggedVerdict`, `blockedVerdict`, `pausedVerdict`), and `signBody` for
+  HMAC-SHA256 signatures in the format `verifyVerdict` expects.
+- README section "Testing without a subscription" documenting the mock API.
+- Kill switch test suite (`test/killswitch.test.mjs`) covering local halt,
+  fail-closed posture, verified state, epoch anti-rollback, and the local
+  audit trail.
 - `CONTRIBUTING.md` with development setup, code standards, and pull request workflow.
 - `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1).
 - `SECURITY.md` with coordinated disclosure process and scope.
@@ -19,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `test/helpers.mjs` now reuses the public mock (`@anterislab/guard/mock`)
+  instead of maintaining a private duplicate. If the public mock is not good
+  enough for our own tests, it is not good enough for consumers.
 - All user-facing content translated to English: README, source comments, error
   messages, CLI messages, test descriptions and fixtures. AnterisLab Guard is an
   international project; English is its primary language.
