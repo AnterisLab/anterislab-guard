@@ -1,10 +1,11 @@
+
 #!/data/data/com.termux/files/usr/bin/bash
-# Bootstrap da zero su Android/Termux.
+# Bootstrap from scratch on Android/Termux.
 #
-# Perche' esiste: su Termux non c'e' `node` di sistema, non c'e' `git` per default, e alcuni pacchetti
-# hanno nomi diversi da Debian. Questo script fa i tre passi nell'ordine giusto e verifica l'esito.
+# Why this exists: on Termux there is no system `node`, no `git` by default, and some packages
+# have different names than on Debian. This script runs the three steps in the right order and verifies the result.
 #
-# Uso:
+# Usage:
 #   pkg install -y curl
 #   bash scripts/setup-termux.sh
 
@@ -14,29 +15,29 @@ info() { printf '\033[1;36m==>\033[0m %s\n' "$1"; }
 fail() { printf '\033[1;31m[x]\033[0m %s\n' "$1" >&2; exit 1; }
 
 if [ -z "${TERMUX_VERSION:-}" ] && [ ! -d /data/data/com.termux ]; then
-  fail 'Questo script richiede Termux. Su Linux o macOS usa scripts/dev.sh.'
+  fail 'This script requires Termux. On Linux or macOS use scripts/dev.sh.'
 fi
 
-info 'aggiornamento dell indice dei pacchetti'
+info 'updating the package index'
 pkg update -y >/dev/null 2>&1 || true
 
-info 'installazione: nodejs, git, curl'
+info 'installing: nodejs, git, curl'
 pkg install -y nodejs git curl >/dev/null
 
 info "Node $(node --version) / npm $(npm --version)"
 
-# Su Termux `npm ci` puo' ricompilare dipendenze native: qui non ce ne sono (zero dipendenze runtime),
-# quindi l'installazione e' veloce anche su telefono.
-info 'installazione dipendenze di sviluppo'
+# On Termux `npm ci` may rebuild native dependencies: there are none here (zero runtime dependencies),
+# so the install is fast even on a phone.
+info 'installing development dependencies'
 (cd "$(dirname "$0")/../guard" && npm install --no-audit --no-fund >/dev/null)
 (cd "$(dirname "$0")/../server" && npm install --no-audit --no-fund >/dev/null)
 
-info 'compilazione'
+info 'build'
 (cd "$(dirname "$0")/../guard" && npm run build >/dev/null)
 (cd "$(dirname "$0")/../server" && npm run build >/dev/null)
 
-info 'esecuzione dei test'
+info 'running tests'
 (cd "$(dirname "$0")/../guard" && node --test test/*.test.mjs >/dev/null)
 (cd "$(dirname "$0")/../server" && node --test test/*.test.mjs >/dev/null)
 
-info 'bootstrap completato. Avvia con: bash scripts/dev.sh'
+info 'bootstrap complete. Start with: bash scripts/dev.sh'
