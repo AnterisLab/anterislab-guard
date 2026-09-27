@@ -1,11 +1,12 @@
+
 #!/usr/bin/env bash
-# Avvio in sviluppo, un comando solo.
+# Development startup, a single command.
 #
-# Perche' esiste: la sequenza corretta (copia .env, compila il SDK, compila il server, carica la
-# policy) ha quattro passi che si dimenticano sempre il primo giorno. Qui sono in ordine, e se un
-# passo fallisce lo script si ferma invece di far partire un server mezzo configurato.
+# Why this exists: the correct sequence (copy .env, build the SDK, build the server, load the
+# policy) has four steps that everyone forgets on the first day. Here they are in order, and if a
+# step fails the script stops instead of starting a half-configured server.
 #
-# Funziona identico su Debian, macOS e Termux: nessuna dipendenza oltre a `node` e `npm`.
+# Works identically on Debian, macOS and Termux: no dependencies other than `node` and `npm`.
 
 set -euo pipefail
 
@@ -16,19 +17,19 @@ info() { printf '\033[1;36m==>\033[0m %s\n' "$1"; }
 warn() { printf '\033[1;33m[!]\033[0m %s\n' "$1"; }
 fail() { printf '\033[1;31m[x]\033[0m %s\n' "$1" >&2; exit 1; }
 
-command -v node >/dev/null 2>&1 || fail 'node non trovato. Installa Node 18+ (vedi la guida, sezione Termux).'
-node -e 'const [maj]=process.versions.node.split(".").map(Number); if (maj<18) { console.error(`serve Node >= 18, trovato ${process.versions.node}`); process.exit(1); }'
+command -v node >/dev/null 2>&1 || fail 'node not found. Install Node 18+ (see the guide, Termux section).'
+node -e 'const [maj]=process.versions.node.split(".").map(Number); if (maj<18) { console.error(`need Node >= 18, found ${process.versions.node}`); process.exit(1); }'
 info "Node $(node --version)"
 
 # 1. .env
 if [ ! -f .env ]; then
   cp .env.example .env
-  warn '.env creato da .env.example. In modalita ANTERISLAB_DEV=1 i valori vuoti sono accettabili.'
+  warn '.env created from .env.example. In ANTERISLAB_DEV=1 mode, empty values are acceptable.'
 fi
 
-# 2. Carica .env nell'ambiente, se presente.
-#    L'apice singolo nel file e' obbligatorio per i valori JSON: senza, bash rimuove le virgolette
-#    interne e il JSON diventa invalido (e l'errore che si vede e' "deve essere un array JSON").
+# 2. Load .env into the environment, if present.
+#    The single quotes in the file are mandatory for JSON values: without them, bash strips
+#    the inner quotes and the JSON becomes invalid (and the error you see is "must be a JSON array").
 if [ -f .env ]; then
   set -a
   # shellcheck disable=SC1091
@@ -36,17 +37,17 @@ if [ -f .env ]; then
   set +a
 fi
 
-# 3. In sviluppo, una PRINCIPALS ancora segnaposto vale come "non configurata": meglio generare la
-#    credenziale demo che partire con una chiave finta che nessuno conosce.
-if [ "${ANTERISLAB_DEV:-0}" = '1' ] && printf '%s' "${ANTERISLAB_KS_PRINCIPALS:-}" | grep -q 'SOSTITUISCI-CON-32-CARATTERI-CASUALI'; then
-  warn 'ANTERISLAB_KS_PRINCIPALS contiene ancora il segnaposto: uso la credenziale di sviluppo.'
+# 3. In development, a PRINCIPALS still containing the placeholder counts as "not configured":
+#    better to generate the demo credential than to start with a fake key nobody knows.
+if [ "${ANTERISLAB_DEV:-0}" = '1' ] && printf '%s' "${ANTERISLAB_KS_PRINCIPALS:-}" | grep -q 'REPLACE-WITH-32-RANDOM-CHARACTERS'; then
+  warn 'ANTERISLAB_KS_PRINCIPALS still contains the placeholder: using the development credential.'
   unset ANTERISLAB_KS_PRINCIPALS
 fi
 
-# 3. Dipendenze e compilazione. `npm ci` se c'e' un lockfile (riproducibile), altrimenti `install`.
+# 3. Dependencies and build. `npm ci` if a lockfile exists (reproducible), otherwise `install`.
 install_pkg() {
   local dir="$1"
-  info "dipendenze: $dir"
+  info "dependencies: $dir"
   if [ -f "$dir/package-lock.json" ]; then
     (cd "$dir" && npm ci --no-audit --no-fund >/dev/null)
   else
@@ -57,22 +58,22 @@ install_pkg() {
 if [ ! -d guard/node_modules ]; then install_pkg guard; fi
 if [ ! -d server/node_modules ]; then install_pkg server; fi
 
-info 'compilazione SDK'
+info 'building SDK'
 (cd guard && npm run build >/dev/null)
-info 'compilazione control plane'
+info 'building control plane'
 (cd server && npm run build >/dev/null)
 
-# 4. Il server deve avere almeno un tenant con un piano, altrimenti il primo /evaluate risponde 402
-#    per un motivo che sembra un bug e non lo e'.
+# 4. The server must have at least one tenant with a plan, otherwise the first /evaluate responds
+#    402 for a reason that looks like a bug but is not.
 if [ -z "${ANTERISLAB_KS_PRINCIPALS:-}" ]; then
-  warn 'ANTERISLAB_KS_PRINCIPALS vuota: uso la credenziale di sviluppo (tenant demo-tenant).'
+  warn 'ANTERISLAB_KS_PRINCIPALS is empty: using the development credential (tenant demo-tenant).'
   export ANTERISLAB_DEV=1
 fi
 
-info 'avvio del control plane su http://127.0.0.1:8787'
+info 'starting the control plane on http://127.0.0.1:8787'
 infoline=''
 if [ "${ANTERISLAB_DEV:-0}" = '1' ]; then
-  infoline='modalita sviluppo: chiavi effimere, credenziale dev-operator-key-000000000000, dashboard su /dashboard'
+  infoline='development mode: ephemeral keys, dev-operator-key-000000000000 credential, dashboard at /dashboard'
 fi
 [ -n "$infoline" ] && warn "$infoline"
 
