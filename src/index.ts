@@ -1,16 +1,16 @@
 /**
- * @anterislab/guard - punto di ingresso.
+ * @anterislab/guard - entry point.
  *
- * Ordine deliberato di ogni azione protetta:
- *   1. GATE KILL SWITCH (stato firmato verificato) - prima della policy, non dopo;
- *   2. valutazione della policy su /api/v1/evaluate;
- *   3. allow-list positiva del verdetto;
- *   4. verifica della firma del verdetto (se configurata);
- *   5. RICONTROLLO del kill switch a stato congelato: un halt arrivato durante il punto 2 ferma
- *      comunque l'azione (anti-TOCTOU).
+ * Deliberate order of every protected action:
+ *   1. KILL SWITCH GATE (verified signed state) - before policy, not after;
+ *   2. policy evaluation on /api/v1/evaluate;
+ *   3. positive allow-list of the verdict;
+ *   4. verdict signature verification (if configured);
+ *   5. RE-CHECK of the kill switch against the frozen state: a halt arriving during step 2 still
+ *      stops the action (anti-TOCTOU).
  *
- * Nessun hook, nessun `catch`, nessun default puo' autorizzare un'azione. Solo un verdetto
- * positivo e riconosciuto lo fa.
+ * No hook, no `catch`, no default can authorize an action. Only a positive, recognized verdict
+ * does.
  */
 
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
@@ -37,54 +37,54 @@ import { stripTrailingSlashes } from './shared/url.js';
 
 export const SDK_VERSION = '0.2.0';
 
-/** Host ammessi per default: la chiave non viaggia mai verso un host arbitrario. */
+/** Default allowed hosts: the key never travels to an arbitrary host. */
 export const DEFAULT_ALLOWED_HOSTS: readonly string[] = ['www.anterislab.com', 'anterislab.com'];
 export const DEFAULT_BASE_URL = 'https://www.anterislab.com';
 
 export interface GuardOptions {
-  /** Chiave API dell'agente. Obbligatoria. Non compare mai in URL, corpo o errori. */
+  /** Agent API key. Required. Never appears in URLs, bodies, or errors. */
   apiKey: string;
-  /** Origine del control plane. Deve essere in `allowedHosts`. Default https://www.anterislab.com */
+  /** Control plane origin. Must be listed in `allowedHosts`. Default https://www.anterislab.com */
   baseUrl?: string;
-  /** Host verso cui la chiave puo' viaggiare. Default anterislab.com + www.anterislab.com */
+  /** Hosts the key is allowed to travel to. Default anterislab.com + www.anterislab.com */
   allowedHosts?: readonly string[];
-  /** Consente http:// SOLO su loopback, per lo sviluppo locale. Default false. */
+  /** Allows http:// ONLY on loopback, for local development. Default false. */
   allowInsecureHttp?: boolean;
-  /** Timeout dell'intera transazione, lettura del corpo inclusa. Default 5000 ms. */
+  /** Timeout for the entire transaction, including body reads. Default 5000 ms. */
   timeoutMs?: number;
-  /** Retry su guasti di trasporto e 5xx. Mai su 401/402/403/409. Default 1. */
+  /** Retries on transport failures and 5xx. Never on 401/402/403/409. Default 1. */
   retries?: number;
-  /** Attesa massima onorata da un Retry-After. Oltre: rifiuto. Default 30000 ms. */
+  /** Maximum delay honored from a Retry-After. Beyond that: reject. Default 30000 ms. */
   maxRetryAfterMs?: number;
-  /** Su guard irraggiungibile prosegue e registra UNAVAILABLE, mai APPROVED. Default false. */
+  /** On unreachable guard, proceeds and records UNAVAILABLE, never APPROVED. Default false. */
   failOpen?: boolean;
-  /** Segreto condiviso HMAC, oppure un verificatore tuo `(body, signature) => boolean`. */
+  /** Shared HMAC secret, or a custom verifier `(body, signature) => boolean`. */
   verifyVerdict?: string | ((rawBody: string, signature: string | null) => boolean);
-  /** Header della firma. Default x-anterislab-signature; accetta sha256=<hex> e <hex>. */
+  /** Signature header. Default x-anterislab-signature; accepts sha256=<hex> and <hex>. */
   signatureHeader?: string;
-  /** Invia un Idempotency-Key per azione, riusato su ogni retry. Default true. */
+  /** Sends an Idempotency-Key per action, reused across retries. Default true. */
   idempotency?: boolean;
-  /** Vincola questo client a una sola identita' agente. Un disallineamento viene rifiutato. */
+  /** Pins this client to a single agent identity. A mismatch is rejected. */
   expectedAgent?: string;
-  /** Invocato su OGNI verdetto usato. Se solleva, l'esito non cambia. */
+  /** Called on EVERY verdict used. If it throws, the outcome does not change. */
   onDecision?: (decision: ParsedDecision, action: Record<string, unknown>) => void;
-  /** Solo notifica. Non autorizza MAI l'esecuzione. */
+  /** Notification only. NEVER authorizes execution. */
   onPaused?: (decision: ParsedDecision, action: Record<string, unknown>) => void | Promise<void>;
-  /** Abilita il gate del kill switch. Senza questo blocco il gate e' assente. */
+  /** Enables the kill switch gate. Without this block, the gate is absent. */
   killSwitch?: KillSwitchManagerOptions;
   fetchImpl?: typeof fetch;
 }
 
 export interface WrapOptions {
-  /** Identita' agente valutata dal control plane. */
+  /** Agent identity evaluated by the control plane. */
   agent: string;
-  /** Nomi di metodo che NON devono essere valutati (es. describe). Espliciti, uno per uno. */
+  /** Method names that must NOT be evaluated (e.g. describe). Explicit, one by one. */
   passthrough?: readonly string[];
 }
 
 export interface WrapFnOptions<A extends unknown[]> {
   agent: string;
-  /** Converte gli argomenti nell'azione da valutare. */
+  /** Converts the arguments into the action to evaluate. */
   toAction: (...args: A) => Record<string, unknown>;
 }
 
@@ -100,7 +100,7 @@ interface ResolvedOptions {
   signatureHeader: string;
 }
 
-/** Serializzazione deterministica minima (chiavi ordinate) per l'impronta dell'azione. */
+/** Minimal deterministic serialization (sorted keys) for the action fingerprint. */
 export function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
   if (Array.isArray(value)) return '[' + value.map((entry) => stableStringify(entry)).join(',') + ']';
@@ -111,7 +111,7 @@ export function stableStringify(value: unknown): string {
   return '{' + entries.join(',') + '}';
 }
 
-/** Digest SHA-256: e' l'unica cosa che esce dagli argomenti dell'agente. */
+/** SHA-256 digest: it is the only thing that leaves the agent's arguments. */
 export function actionDigest(action: Record<string, unknown>): string {
   return createHash('sha256').update(stableStringify(action)).digest('hex');
 }
@@ -218,9 +218,9 @@ export class Guard {
   }
 
   /**
-   * Avvolge un oggetto: OGNI metodo proprio ed ereditato passa dal gate prima di eseguire.
-   * La 0.1.1 proteggeva un solo metodo; qui la copertura e' il default, e le eccezioni vanno
-   * dichiarate una per una in `passthrough`.
+   * Wraps an object: EVERY own and inherited method goes through the gate before executing.
+   * Version 0.1.1 protected only a single method; here, full coverage is the default, and
+   * exceptions must be declared one by one in `passthrough`.
    */
   wrap<T extends object>(target: T, options: WrapOptions): T {
     const passthrough = new Set(options.passthrough ?? []);
@@ -242,7 +242,7 @@ export class Guard {
             metadata: { args_digest: actionDigest({ args: args as unknown[] }) },
           };
           await guard.decide(action, options.agent);
-          // Il metodo viene invocato DOPO il gate: se il gate solleva, l'effetto non accade.
+          // The method is invoked AFTER the gate: if the gate throws, the effect does not happen.
           return await (original as (...a: unknown[]) => unknown).apply(obj, args);
         };
         cache.set(prop, wrapped);
@@ -251,7 +251,7 @@ export class Guard {
     });
   }
 
-  /** Avvolge una singola funzione asincrona (side effect isolato). */
+  /** Wraps a single async function (isolated side effect). */
   wrapFn<A extends unknown[], R>(
     fn: (...args: A) => Promise<R> | R,
     options: WrapFnOptions<A>,
@@ -263,12 +263,12 @@ export class Guard {
     };
   }
 
-  /** Ferma l'agente ORA, senza round-trip di rete e senza attendere il control plane. */
+  /** Stops the agent NOW, without a network round-trip and without waiting for the control plane. */
   async halt(reason: string, evidence?: string): Promise<KillSwitchStatus> {
     return this.requireKillSwitch().haltLocal(reason, evidence ?? 'LOCAL-OPERATOR');
   }
 
-  /** Riabilita l'agente. Richiede uno stato verificato piu' recente del halt (o break-glass). */
+  /** Re-enables the agent. Requires a verified state newer than the halt (or break-glass). */
   async resume(options: { reason: string; evidence?: string; breakGlass?: boolean }): Promise<KillSwitchStatus> {
     return this.requireKillSwitch().resumeLocal({
       reason: options.reason,
@@ -277,25 +277,25 @@ export class Guard {
     });
   }
 
-  /** Stato corrente del kill switch (verificato). */
+  /** Current kill switch state (verified). */
   async status(): Promise<KillSwitchStatus> {
     return this.requireKillSwitch().checkStatus();
   }
 
-  /** Apre il canale SSE: un halt arriva in pochi millisecondi invece che al prossimo poll. */
+  /** Opens the SSE channel: a halt arrives in milliseconds instead of at the next poll. */
   async startStream(): Promise<() => void> {
     return this.requireKillSwitch().startStream();
   }
 
   /**
-   * Valuta un'azione e decide. Questo e' l'unico punto in cui una decisione viene presa.
-   * Restituisce la decisione quando l'azione puo' partire; altrimenti solleva.
+   * Evaluates an action and decides. This is the only place where a decision is made.
+   * Returns the decision when the action may proceed; otherwise throws.
    */
   async decide(action: Record<string, unknown>, agent: string): Promise<ParsedDecision> {
     this.assertAgent(agent);
 
-    // 1. Il kill switch si valuta PRIMA della policy: un agente fermo non interroga nemmeno il
-    //    motore di policy, e soprattutto non consuma quota del piano.
+    // 1. The kill switch is evaluated BEFORE policy: a stopped agent does not even query the
+    //    policy engine, and above all does not consume plan quota.
     await this.gateKillSwitch();
 
     const idempotencyKey = this.options.idempotency ? newIdempotencyKey() : null;
@@ -321,14 +321,14 @@ export class Guard {
       throw new GuardUnavailableError('valutazione non riuscita: ' + (error as Error).message);
     }
 
-    // 2. Allow-list positiva. Un corpo non interpretabile e' un diniego, non un'eccezione.
+    // 2. Positive allow-list. An unparseable body is a denial, not an exception.
     const parsed = parseVerdict(outcome.body, this.expectedAgent);
     if (!parsed.ok) {
       throw new GuardBlockedError(parsed.detail + ' (' + parsed.code + ')', null, null);
     }
     const decision = parsed.decision;
 
-    // 3. Firma del verdetto: se configurata, una firma assente o invalida e' un diniego.
+    // 3. Verdict signature: if configured, a missing or invalid signature is a denial.
     if (this.verify) {
       const signature = outcome.headers.get(this.options.signatureHeader);
       const valid = this.verify(outcome.rawBody, signature);
@@ -344,11 +344,11 @@ export class Guard {
     this.emitDecision(decision, action);
 
     if (decision.decision === 'PAUSED') {
-      // L'hook e' una NOTIFICA. Se risolve, se rigetta o se solleva, l'azione non parte.
+      // The hook is a NOTIFICATION. Whether it resolves, rejects, or throws, the action does not run.
       try {
         await this.onPaused?.(decision, action);
       } catch {
-        // deliberatamente ingoiato: un hook che fallisce non deve diventare un'autorizzazione
+        // deliberately swallowed: a failing hook must not become an authorization
       }
       throw new GuardPausedError(decision.reason, decision.decisionId);
     }
@@ -357,24 +357,24 @@ export class Guard {
       throw new GuardBlockedError(decision.reason, decision.policy, decision.decisionId);
     }
 
-    // 4. Ricontrollo del gate a stato congelato: nessun round-trip, ma un halt avvenuto durante la
-    //    valutazione ferma comunque l'azione (finestra anti-TOCTOU).
+    // 4. Re-check of the gate against the frozen state: no round-trip, but a halt that occurred
+    //    during evaluation still stops the action (anti-TOCTOU window).
     await this.gateKillSwitch({ refresh: false });
 
     return decision;
   }
 
   /**
-   * Telemetria best-effort per contratto. Un consumatore che solleva non deve MAI cambiare una
-   * decisione di sicurezza, ne' in un verso ne' nell'altro. L'ho scoperto scrivendo il test:
-   * la prima versione chiamava `this.onDecision?.()` direttamente e un hook che sollevava
-   * trasformava un normale BLOCKED in un'eccezione di trasporto (illeggibile per chi la riceve).
+   * Best-effort telemetry by contract. A consumer that throws must NEVER change a security
+   * decision, in either direction. I discovered this while writing the test: the first version
+   * called `this.onDecision?.()` directly, and a hook that threw turned a normal BLOCKED into a
+   * transport exception (unreadable for the receiver).
    */
   private emitDecision(decision: ParsedDecision, action: Record<string, unknown>): void {
     try {
       this.onDecision?.(decision, action);
     } catch {
-      // deliberatamente ingoiato: la telemetria non decide nulla
+      // deliberately swallowed: telemetry decides nothing
     }
   }
 
