@@ -33,7 +33,6 @@ import {
   KillSwitchHaltedError,
   KillSwitchConfigError,
   KillSwitchLocalHaltError,
-  KillSwitchRollbackError,
   KillSwitchStaleError,
   KillSwitchUnavailableError,
   type KillSwitchErrorDetails,
