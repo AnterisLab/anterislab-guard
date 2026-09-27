@@ -1,7 +1,7 @@
 /**
- * Enforcement: la garanzia che l'azione NON venga eseguita quando non deve.
- * Ogni test conta gli EFFETTI collaterali reali prodotti dall'agente strumentato, perche'
- * "non ha sollevato" e' una prova piu' debole di "non e' successo niente".
+ * Enforcement: the guarantee that the action is NOT executed when it must not be.
+ * Every test counts the REAL side effects produced by the instrumented agent, because
+ * "it did not throw" is weaker evidence than "nothing happened".
  */
 
 import assert from 'node:assert/strict';
@@ -17,9 +17,9 @@ const BASE = {
   allowedHosts: ['127.0.0.1'],
 };
 
-// --- Copertura: wrap() protegge TUTTI i metodi, non solo il primo ---
-test('wrap() intercetta ogni metodo, non uno solo (difetto A-01)', async () => {
-  const { impl } = makeFetch({ status: 200, body: { decision: 'BLOCKED', reason: 'negato' } });
+// --- Coverage: wrap() protects ALL methods, not just the first one ---
+test('wrap() intercepts every method, not just one (defect A-01)', async () => {
+  const { impl } = makeFetch({ status: 200, body: { decision: 'BLOCKED', reason: 'denied' } });
   const guard = new Guard({ ...BASE, fetchImpl: impl });
   const { agent, effects } = makeAgent();
   const safe = guard.wrap(agent, { agent: 'billing-bot' });
@@ -27,21 +27,21 @@ test('wrap() intercetta ogni metodo, non uno solo (difetto A-01)', async () => {
   await assert.rejects(() => safe.charge(10), GuardBlockedError);
   await assert.rejects(() => safe.refund(10), GuardBlockedError);
 
-  assert.deepEqual(effects, [], 'nessuno dei due metodi ha prodotto effetti');
+  assert.deepEqual(effects, [], 'neither method produced any effect');
 });
 
-test('passthrough esplicito salta il gate solo per i metodi dichiarati', async () => {
-  const { impl } = makeFetch({ status: 200, body: { decision: 'BLOCKED', reason: 'negato' } });
+test('explicit passthrough skips the gate only for declared methods', async () => {
+  const { impl } = makeFetch({ status: 200, body: { decision: 'BLOCKED', reason: 'denied' } });
   const guard = new Guard({ ...BASE, fetchImpl: impl });
   const { agent, effects } = makeAgent();
   const safe = guard.wrap(agent, { agent: 'billing-bot', passthrough: ['describe'] });
 
-  assert.equal(safe.describe(), 'agent strumentato', 'describe e\' passante');
+  assert.equal(safe.describe(), 'instrumented agent', 'describe is passthrough');
   await assert.rejects(() => safe.charge(10), GuardBlockedError);
   assert.deepEqual(effects, []);
 });
 
-test('con APPROVED entrambi i metodi eseguono (controllo positivo)', async () => {
+test('with APPROVED both methods execute (positive control)', async () => {
   const { impl } = makeFetch({ status: 200, body: approved() });
   const guard = new Guard({ ...BASE, fetchImpl: impl });
   const { agent, effects } = makeAgent();
@@ -52,33 +52,33 @@ test('con APPROVED entrambi i metodi eseguono (controllo positivo)', async () =>
   assert.deepEqual(effects, ['charge:10', 'refund:20']);
 });
 
-// --- PAUSED e' sempre bloccante, qualunque cosa faccia l'hook ---
-for (const hookCase of ['risolve', 'rigetta', 'solleva']) {
-  test(`PAUSED blocca anche quando onPaused ${hookCase}`, async () => {
-    const { impl } = makeFetch({ status: 200, body: { decision: 'PAUSED', reason: 'serve revisione', decision_id: 'd-9' } });
+// --- PAUSED always blocks, whatever the hook does ---
+for (const hookCase of ['resolves', 'rejects', 'throws']) {
+  test(`PAUSED blocks even when onPaused ${hookCase}`, async () => {
+    const { impl } = makeFetch({ status: 200, body: { decision: 'PAUSED', reason: 'human review required', decision_id: 'd-9' } });
     let hookCalls = 0;
     const onPaused = async () => {
       hookCalls += 1;
-      if (hookCase === 'rigetta') throw new Error('reviewer non raggiungibile');
-      if (hookCase === 'solleva') throw new Error('boom');
+      if (hookCase === 'rejects') throw new Error('reviewer unreachable');
+      if (hookCase === 'throws') throw new Error('boom');
     };
     const guard = new Guard({ ...BASE, fetchImpl: impl, onPaused });
     const { agent, effects } = makeAgent();
     const safe = guard.wrapFn(agent.charge, { agent: 'billing-bot', toAction: (a) => ({ type: 'payment', amount: a }) });
 
     await assert.rejects(() => safe(5000), GuardPausedError);
-    assert.equal(hookCalls, 1, 'l hook e\' stato notificato');
-    assert.deepEqual(effects, [], 'l hook NON ha autorizzato nulla');
+    assert.equal(hookCalls, 1, 'the hook was notified');
+    assert.deepEqual(effects, [], 'the hook did NOT authorize anything');
   });
 }
 
-test('onDecision e\' invocato ma non puo\' cambiare l\'esito', async () => {
+test('onDecision is invoked but cannot change the outcome', async () => {
   const { impl } = makeFetch({ status: 200, body: { decision: 'BLOCKED', reason: 'no' } });
   const seen = [];
   const guard = new Guard({
     ...BASE,
     fetchImpl: impl,
-    onDecision: (decision) => { seen.push(decision.decision); throw new Error('telemetria rotta'); },
+    onDecision: (decision) => { seen.push(decision.decision); throw new Error('broken telemetry'); },
   });
   const { agent, effects } = makeAgent();
   const safe = guard.wrapFn(agent.charge, { agent: 'billing-bot', toAction: (a) => ({ type: 'payment', amount: a }) });
@@ -88,10 +88,10 @@ test('onDecision e\' invocato ma non puo\' cambiare l\'esito', async () => {
   assert.deepEqual(effects, []);
 });
 
-// --- Firma del verdetto ---
-const SECRET = 'segreto-condiviso-lungo-abbastanza';
+// --- Verdict signature ---
+const SECRET = 'shared-secret-long-enough';
 
-test('con verifyVerdict, un verdetto APPROVED non firmato viene negato', async () => {
+test('with verifyVerdict, an unsigned APPROVED verdict is denied', async () => {
   const body = JSON.stringify(approved());
   const { impl } = makeFetch({ status: 200, raw: body });
   const guard = new Guard({ ...BASE, fetchImpl: impl, verifyVerdict: SECRET });
@@ -99,10 +99,10 @@ test('con verifyVerdict, un verdetto APPROVED non firmato viene negato', async (
   const safe = guard.wrapFn(agent.charge, { agent: 'billing-bot', toAction: (a) => ({ type: 'payment', amount: a }) });
 
   await assert.rejects(() => safe(10), GuardBlockedError);
-  assert.deepEqual(effects, [], 'un APPROVED non autentico non autorizza');
+  assert.deepEqual(effects, [], 'an unauthentic APPROVED does not authorize');
 });
 
-test('con verifyVerdict, una firma valida fa passare l\'azione', async () => {
+test('with verifyVerdict, a valid signature lets the action through', async () => {
   const body = JSON.stringify(approved());
   const { impl } = makeFetch({ status: 200, raw: body, headers: { 'x-anterislab-signature': signBody(SECRET, body) } });
   const guard = new Guard({ ...BASE, fetchImpl: impl, verifyVerdict: SECRET });
@@ -113,7 +113,7 @@ test('con verifyVerdict, una firma valida fa passare l\'azione', async () => {
   assert.deepEqual(effects, ['charge:10']);
 });
 
-test('una firma valida su un corpo DIVERSO non autorizza', async () => {
+test('a valid signature over a DIFFERENT body does not authorize', async () => {
   const body = JSON.stringify(approved());
   const { impl } = makeFetch({ status: 200, raw: body, headers: { 'x-anterislab-signature': signBody(SECRET, body + ' ') } });
   const guard = new Guard({ ...BASE, fetchImpl: impl, verifyVerdict: SECRET });
@@ -124,31 +124,31 @@ test('una firma valida su un corpo DIVERSO non autorizza', async () => {
   assert.deepEqual(effects, []);
 });
 
-// --- Configurazione che indebolirebbe le garanzie: rifiutata alla costruzione ---
-test('baseUrl http:// non-loopback viene rifiutato alla costruzione', () => {
+// --- Configuration that would weaken guarantees: rejected at construction ---
+test('non-loopback http:// baseUrl is rejected at construction', () => {
   assert.throws(
     () => new Guard({ ...BASE, baseUrl: 'http://evil.example', allowedHosts: ['evil.example'] }),
     GuardConfigError,
   );
 });
 
-test('un host non in allowedHosts viene rifiutato', () => {
+test('a host not in allowedHosts is rejected', () => {
   assert.throws(() => new Guard({ ...BASE, baseUrl: 'https://evil.example' }), GuardConfigError);
 });
 
-test('senza apiKey il costruttore rifiuta', () => {
+test('without apiKey the constructor rejects', () => {
   assert.throws(() => new Guard({ ...BASE, apiKey: '' }), GuardConfigError);
 });
 
-test('http:// su loopback e\' permesso solo con allowInsecureHttp', () => {
+test('http:// on loopback is allowed only with allowInsecureHttp', () => {
   assert.throws(() => new Guard({ ...BASE, allowInsecureHttp: false }), GuardConfigError);
 });
 
-test('un segreto di firma troppo corto viene rifiutato', () => {
-  assert.throws(() => new Guard({ ...BASE, verifyVerdict: 'corto' }), GuardConfigError);
+test('a signing secret that is too short is rejected', () => {
+  assert.throws(() => new Guard({ ...BASE, verifyVerdict: 'short' }), GuardConfigError);
 });
 
-test('killSwitch assente: halt() lo dice esplicitamente invece di fingere', async () => {
+test('killSwitch absent: halt() says so explicitly instead of pretending', async () => {
   const { impl } = makeFetch({ status: 200, body: approved() });
   const guard = new Guard({ ...BASE, fetchImpl: impl });
   await assert.rejects(() => guard.halt('test'), GuardConfigError);
