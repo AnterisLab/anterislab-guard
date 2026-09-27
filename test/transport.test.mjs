@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { Guard, GuardQuotaError, GuardAuthError, GuardUnavailableError, GuardBlockedError } from './imports.mjs';
+import { Guard, GuardQuotaError, GuardAuthError, GuardUnavailableError } from './imports.mjs';
 import { makeAgent, approved } from './helpers.mjs';
 
 const BASE = {
