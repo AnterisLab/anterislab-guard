@@ -54,6 +54,21 @@ export default tseslint.config(
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
+      // `const guard = this` inside wrap/wrapFn captures the Guard instance
+      // for the Proxy handler, whose `this` is the Proxy, not the Guard.
+      // The alias is required and intentional.
+      '@typescript-eslint/no-this-alias': [
+        'error',
+        { allowedNames: ['guard'] },
+      ],
+    },
+  },
+  {
+    // `boundedString` deliberately matches control characters to reject them
+    // in claim fields. The regex IS the check, not a smell.
+    files: ['src/shared/killswitch-token.ts'],
+    rules: {
+      'no-control-regex': 'off',
     },
   },
 );
