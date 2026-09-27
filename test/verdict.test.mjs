@@ -1,6 +1,6 @@
 /**
- * Verdetto: la garanzia che una risposta non riconosciuta NON autorizza.
- * Questi test sono la prova ri-eseguibile del difetto C-01/C-02 della 0.1.1.
+ * Verdict: the guarantee that an unrecognized response does NOT authorize.
+ * These tests are the re-runnable proof of the 0.1.1 defect C-01/C-02.
  */
 
 import assert from 'node:assert/strict';
@@ -9,8 +9,9 @@ import { test } from 'node:test';
 import { Guard, GuardBlockedError } from './imports.mjs';
 import { makeFetch, makeAgent, approved } from './helpers.mjs';
 
-// Nota didattica: `allowedHosts` va dichiarato anche per lo sviluppo locale. Il vincolo non
-// "si allenta" da solo perche' l'host e' loopback: la chiave va autorizzata verso un host, sempre.
+// Teaching note: `allowedHosts` must be declared for local development too. The constraint does
+// not "relax" on its own just because the host is loopback: the key must be authorized toward a
+// host, always.
 const BASE = {
   apiKey: 'key-0123456789abcdef',
   baseUrl: 'http://127.0.0.1:8787',
@@ -28,107 +29,107 @@ async function runWith(body, options = {}) {
   return { error, effects, calls };
 }
 
-// --- La controprova: APPROVED esegue, altrimenti i test sotto non provano nulla ---
-test('APPROVED esegue l\'azione (controllo positivo)', async () => {
+// --- The control: APPROVED executes, otherwise the tests below prove nothing ---
+test('APPROVED executes the action (positive control)', async () => {
   const { error, effects } = await runWith(approved());
   assert.equal(error, null);
   assert.deepEqual(effects, ['charge:4200']);
 });
 
-// --- Il difetto storico: lo schema DOCUMENTATO {verdict:"block"} deve bloccare ---
-test('schema documentato {verdict:"block"} blocca (PoC v15)', async () => {
-  const { error, effects } = await runWith({ verdict: 'block', reason: 'limite pagamenti', policy: 'Payment limit' });
-  assert.ok(error instanceof GuardBlockedError, 'atteso GuardBlockedError');
-  assert.deepEqual(effects, [], 'nessun effetto collaterale');
+// --- The historical defect: the DOCUMENTED schema {verdict:"block"} must block ---
+test('documented schema {verdict:"block"} blocks (PoC v15)', async () => {
+  const { error, effects } = await runWith({ verdict: 'block', reason: 'payment limit', policy: 'Payment limit' });
+  assert.ok(error instanceof GuardBlockedError, 'expected GuardBlockedError');
+  assert.deepEqual(effects, [], 'no side effect');
 });
 
-test('decision BLOCKED blocca', async () => {
-  const { error, effects } = await runWith({ decision: 'BLOCKED', reason: 'negato' });
+test('decision BLOCKED blocks', async () => {
+  const { error, effects } = await runWith({ decision: 'BLOCKED', reason: 'denied' });
   assert.ok(error instanceof GuardBlockedError);
   assert.deepEqual(effects, []);
 });
 
-test('decision FLAGGED esegue (autorizzante)', async () => {
+test('decision FLAGGED executes (authorizing)', async () => {
   const { error, effects } = await runWith({ decision: 'FLAGGED' });
   assert.equal(error, null);
   assert.deepEqual(effects, ['charge:4200']);
 });
 
-// --- Corpi ostili: 21 varianti, tutte devono negare ---
+// --- Hostile bodies: 18 variants, all must deny ---
 const HOSTILE = [
-  ['oggetto vuoto', {}],
+  ['empty object', {}],
   ['null', null],
   ['array', []],
-  ['stringa', 'APPROVED'],
-  ['numero', 200],
+  ['string', 'APPROVED'],
+  ['number', 200],
   ['decision null', { decision: null }],
-  ['decision stringa vuota', { decision: '' }],
-  ['decision spazi', { decision: '   ' }],
-  ['parola sconosciuta', { decision: 'YES_PLEASE' }],
-  ['UNAVAILABLE dal server', { decision: 'UNAVAILABLE' }],
-  ['decision booleano', { decision: true }],
-  ['decision oggetto', { decision: { ok: true } }],
-  ['verdict sconosciuto', { verdict: 'maybe' }],
-  ['solo reason', { reason: 'ok' }],
-  ['policy senza verdetto', { policy: 'P-1' }],
-  ['error envelope annidato', { error: { code: 'internal_error' } }],
-  ['conflitto APPROVED/BLOCKED', { decision: 'APPROVED', verdict: 'blocked' }],
-  ['conflitto BLOCKED/approved', { decision: 'BLOCKED', verdict: 'approved' }],
+  ['decision empty string', { decision: '' }],
+  ['decision spaces', { decision: '   ' }],
+  ['unknown word', { decision: 'YES_PLEASE' }],
+  ['UNAVAILABLE from server', { decision: 'UNAVAILABLE' }],
+  ['decision boolean', { decision: true }],
+  ['decision object', { decision: { ok: true } }],
+  ['unknown verdict', { verdict: 'maybe' }],
+  ['reason only', { reason: 'ok' }],
+  ['policy without verdict', { policy: 'P-1' }],
+  ['nested error envelope', { error: { code: 'internal_error' } }],
+  ['APPROVED/BLOCKED conflict', { decision: 'APPROVED', verdict: 'blocked' }],
+  ['BLOCKED/approved conflict', { decision: 'BLOCKED', verdict: 'approved' }],
 ];
 
 for (const [name, body] of HOSTILE) {
-  test(`corpo ostile: ${name} -> nessun effetto`, async () => {
+  test(`hostile body: ${name} -> no effect`, async () => {
     const { error, effects } = await runWith(body);
-    assert.ok(error instanceof GuardBlockedError, `atteso diniego per ${name}, ricevuto ${error}`);
-    assert.deepEqual(effects, [], `nessun effetto per ${name}`);
+    assert.ok(error instanceof GuardBlockedError, `expected denial for ${name}, got ${error}`);
+    assert.deepEqual(effects, [], `no effect for ${name}`);
   });
 }
 
-test('alias legacy minuscolo `allow` esegue (compatibilita contratto v17 R2)', async () => {
-  // Deliberato: gli alias sono accettati per non rompere i client 0.1.x durante il rilascio
-  // coordinato. Il backend DEVE comunque emettere `decision` canonico. Questo test fissa il
-  // comportamento, cosi' un cambio di idea e' una decisione visibile e non una regressione muta.
+test('lowercase legacy alias `allow` executes (contract v17 R2 compatibility)', async () => {
+  // Deliberate: aliases are accepted to avoid breaking 0.1.x clients during a coordinated
+  // release. The backend MUST still emit the canonical `decision`. This test pins the behavior,
+  // so a change of mind becomes a visible decision rather than a silent regression.
   const { error, effects } = await runWith({ decision: 'allow' });
   assert.equal(error, null);
   assert.deepEqual(effects, ['charge:4200']);
 });
 
-test('schema legacy {verdict:"approve"} esegue', async () => {
+test('legacy schema {verdict:"approve"} executes', async () => {
   const { error, effects } = await runWith({ verdict: 'approve' });
   assert.equal(error, null);
   assert.deepEqual(effects, ['charge:4200']);
 });
 
-test('con expectedAgent impostato, un agente disallineato viene negato', async () => {
-  const { error, effects } = await runWith({ decision: 'APPROVED', agent: 'altro-agente' }, { expectedAgent: 'billing-bot' });
+test('with expectedAgent set, a mismatched agent is denied', async () => {
+  const { error, effects } = await runWith({ decision: 'APPROVED', agent: 'other-agent' }, { expectedAgent: 'billing-bot' });
   assert.ok(error instanceof GuardBlockedError);
   assert.deepEqual(effects, []);
 });
 
-test('senza expectedAgent la pinning dell agente non e attiva (opt-in)', async () => {
-  const { error, effects } = await runWith({ decision: 'APPROVED', agent: 'altro-agente' });
+test('without expectedAgent the agent pinning is not active (opt-in)', async () => {
+  const { error, effects } = await runWith({ decision: 'APPROVED', agent: 'other-agent' });
   assert.equal(error, null);
   assert.deepEqual(effects, ['charge:4200']);
 });
 
-test('latency_ms non numerica non blocca: e telemetria, non autorizzazione', async () => {
-  const { error, effects } = await runWith({ decision: 'APPROVED', latency_ms: 'veloce' });
+test('non-numeric latency_ms does not block: it is telemetry, not authorization', async () => {
+  const { error, effects } = await runWith({ decision: 'APPROVED', latency_ms: 'fast' });
   assert.equal(error, null);
   assert.deepEqual(effects, ['charge:4200']);
 });
 
-test('request per un agente diverso da expectedAgent viene negata prima della rete', async () => {
+test('request for an agent different from expectedAgent is denied before the network', async () => {
   const { impl, calls } = makeFetch({ status: 200, body: approved() });
   const guard = new Guard({ ...BASE, fetchImpl: impl, expectedAgent: 'billing-bot' });
   const { agent, effects } = makeAgent();
-  const safe = guard.wrapFn(agent.charge, { agent: 'altro-agente', toAction: (a) => ({ type: 'payment', amount: a }) });
+  const safe = guard.wrapFn(agent.charge, { agent: 'other-agent', toAction: (a) => ({ type: 'payment', amount: a }) });
   await assert.rejects(() => safe(10), GuardBlockedError);
   assert.deepEqual(effects, []);
-  assert.equal(calls.evaluate, 0, 'nessuna chiamata di rete: il vincolo e locale');
+  assert.equal(calls.evaluate, 0, 'no network call: the constraint is local');
 });
 
-test('corpo HTML di un captive portal -> diniego', async () => {
-  const { impl } = makeFetch({ status: 200, raw: '<html><body>Accedi al WiFi</body></html>' });
+test('HTML body from a captive portal -> denial', async () => {
+  const { impl } = makeFetch({ status: 200, raw: '<html><body>Sign in to WiFi</body></html>' });
   const guard = new Guard({ ...BASE, fetchImpl: impl });
   const { agent, effects } = makeAgent();
   const safe = guard.wrapFn(agent.charge, { agent: 'billing-bot', toAction: (a) => ({ type: 'payment', amount: a }) });
@@ -136,7 +137,7 @@ test('corpo HTML di un captive portal -> diniego', async () => {
   assert.deepEqual(effects, []);
 });
 
-test('JSON troncato -> diniego', async () => {
+test('truncated JSON -> denial', async () => {
   const { impl } = makeFetch({ status: 200, raw: '{"decision":"APPRO' });
   const guard = new Guard({ ...BASE, fetchImpl: impl });
   const { agent, effects } = makeAgent();
