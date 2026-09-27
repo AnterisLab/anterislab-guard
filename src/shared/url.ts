@@ -1,6 +1,6 @@
 /**
- * Rimuove gli slash finali da una URL senza usare una regex non ancorata
- * (vulnerabile a ReDoS su input con molte ripetizioni di '/').
+ * Removes trailing slashes from a URL without using an unanchored regex
+ * (vulnerable to ReDoS on input with many repetitions of '/').
  */
 export function stripTrailingSlashes(url: string): string {
   let end = url.length;
