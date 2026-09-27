@@ -1,16 +1,16 @@
 /**
- * Gerarchia degli errori del SDK.
+ * SDK error hierarchy.
  *
- * Regola di design: NESSUN errore di questa gerarchia autorizza un'azione.
- * Tutti derivano da `GuardError`, quindi un `catch (e) { if (e instanceof GuardError) ... }`
- * intercetta qualsiasi motivo per cui il guard ha fermato l'agente.
+ * Design rule: NO error in this hierarchy authorizes an action.
+ * All derive from `GuardError`, so a `catch (e) { if (e instanceof GuardError) ... }`
+ * catches any reason the guard stopped the agent.
  */
 
-/** Radice comune: se catturi questo, hai catturato ogni motivo di arresto. */
+/** Common root: if you catch this, you have caught every reason for a stop. */
 export class GuardError extends Error {
-  /** Codice stabile, pensato per log e metriche (mai per il controllo di flusso). */
+  /** Stable code, meant for logs and metrics (never for control flow). */
   readonly code: string;
-  /** true quando l'azione NON e' stata eseguita. Sempre true tranne nei casi documentati. */
+  /** true when the action was NOT executed. Always true except in documented cases. */
   readonly blocked: boolean;
 
   constructor(code: string, message: string, blocked = true) {
@@ -21,14 +21,14 @@ export class GuardError extends Error {
   }
 }
 
-/** La policy ha negato l'azione (verdetto BLOCKED, o qualunque risposta non riconosciuta). */
+/** The policy denied the action (BLOCKED verdict, or any unrecognized response). */
 export class GuardBlockedError extends GuardError {
   readonly policy: string | null;
   readonly decisionId: string | null;
   readonly reason: string;
 
   constructor(reason: string, policy: string | null, decisionId: string | null = null) {
-    super('GUARD_BLOCKED', `azione BLOCCATA dalla policy: ${reason}`, true);
+    super('GUARD_BLOCKED', `action BLOCKED by policy: ${reason}`, true);
     this.name = 'GuardBlockedError';
     this.reason = reason;
     this.policy = policy;
@@ -36,20 +36,20 @@ export class GuardBlockedError extends GuardError {
   }
 }
 
-/** Il verdetto e' PAUSED: l'azione resta sospesa in attesa di revisione umana. */
+/** The verdict is PAUSED: the action remains suspended pending human review. */
 export class GuardPausedError extends GuardError {
   readonly decisionId: string | null;
   readonly reason: string;
 
   constructor(reason: string, decisionId: string | null = null) {
-    super('GUARD_PAUSED', `azione SOSPESA per revisione umana: ${reason}`, true);
+    super('GUARD_PAUSED', `action PAUSED for human review: ${reason}`, true);
     this.name = 'GuardPausedError';
     this.reason = reason;
     this.decisionId = decisionId;
   }
 }
 
-/** 401/403: chiave non valida, revocata, o agente fuori scope. Terminale: mai ritentato. */
+/** 401/403: invalid, revoked key, or agent out of scope. Terminal: never retried. */
 export class GuardAuthError extends GuardError {
   readonly status: number;
 
@@ -60,7 +60,7 @@ export class GuardAuthError extends GuardError {
   }
 }
 
-/** 402: quota del piano esaurita. Terminale, mai ritentato, MAI fail-open. */
+/** 402: plan quota exhausted. Terminal, never retried, NEVER fail-open. */
 export class GuardQuotaError extends GuardError {
   readonly plan: string | null;
   readonly limit: number | null;
@@ -69,7 +69,7 @@ export class GuardQuotaError extends GuardError {
   constructor(plan: string | null, limit: number | null, used: number | null) {
     super(
       'GUARD_QUOTA_EXCEEDED',
-      `quota del piano esaurita (piano=${plan ?? '?'} usati=${used ?? '?'} limite=${limit ?? '?'})`,
+      `plan quota exhausted (plan=${plan ?? '?'} used=${used ?? '?'} limit=${limit ?? '?'})`,
       true,
     );
     this.name = 'GuardQuotaError';
@@ -79,7 +79,7 @@ export class GuardQuotaError extends GuardError {
   }
 }
 
-/** 409: snapshot di policy stantio. Terminale: riallinea l'etag e ripeti con una nuova chiave. */
+/** 409: stale policy snapshot. Terminal: realign the etag and retry with a new key. */
 export class GuardPolicyError extends GuardError {
   readonly expected: string | null;
   readonly received: string | null;
@@ -92,9 +92,9 @@ export class GuardPolicyError extends GuardError {
   }
 }
 
-/** Guard irraggiungibile (timeout, rete, 5xx dopo il budget): fail-closed per default. */
+/** Guard unreachable (timeout, network, 5xx after the budget): fail-closed by default. */
 export class GuardUnavailableError extends GuardError {
-  /** true quando il chiamante ha scelto `failOpen: true` e ha deciso di procedere comunque. */
+  /** true when the caller chose `failOpen: true` and decided to proceed anyway. */
   readonly failOpenApplied: boolean;
 
   constructor(message: string, failOpenApplied = false) {
@@ -104,7 +104,7 @@ export class GuardUnavailableError extends GuardError {
   }
 }
 
-/** Il kill switch ha fermato l'agente (control plane oppure halt locale). */
+/** The kill switch stopped the agent (control plane or local halt). */
 export class GuardHaltedError extends GuardError {
   readonly origin: 'control-plane' | 'local' | 'fail-closed';
   readonly epoch: number | null;
@@ -117,7 +117,7 @@ export class GuardHaltedError extends GuardError {
   }
 }
 
-/** Configurazione non valida (host non ammesso, http:// non-loopback, opzioni incoerenti). */
+/** Invalid configuration (host not allowed, non-loopback http://, inconsistent options). */
 export class GuardConfigError extends GuardError {
   constructor(message: string) {
     super('GUARD_CONFIG', message, true);
@@ -125,7 +125,7 @@ export class GuardConfigError extends GuardError {
   }
 }
 
-/** Stato del kill switch non verificabile: token scaduto, firma invalida, epoch regressivo. */
+/** Kill switch state not verifiable: expired token, invalid signature, regressive epoch. */
 export class GuardStateInvalidError extends GuardError {
   constructor(message: string) {
     super('GUARD_STATE_INVALID', message, true);
