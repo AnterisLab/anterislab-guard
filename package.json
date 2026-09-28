@@ -1,16 +1,17 @@
-
 {
   "name": "@anterislab/guard",
-  "version": "0.2.1",
+  "version": "1.0.0",
   "description": "Real-time policy guard for autonomous agents: every action is evaluated against your plain-language policies before it executes. Fail-closed by construction.",
   "keywords": [
     "ai-agents",
+    "ai-safety",
     "guardrails",
     "policy-engine",
     "llm-safety",
     "autonomous-agents",
     "kill-switch",
-    "audit-trail"
+    "audit-trail",
+    "fail-closed"
   ],
   "license": "MIT",
   "type": "module",
@@ -49,9 +50,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
-    "@types/node": "^26.6.2",
+    "@types/node": "^20.19.43",
     "eslint": "^9.18.0",
-    "typescript": "^7.0.2",
+    "typescript": "^5.9.3",
     "typescript-eslint": "^8.20.0"
   },
   "repository": {
@@ -61,7 +62,7 @@
   "bugs": {
     "url": "https://github.com/AnterisLab/anterislab-guard/issues"
   },
-  "homepage": "https://www.anterislab.com",
+  "homepage": "https://anterislab.com",
   "author": "AnterisLab <hello@anterislab.com>",
   "publishConfig": {
     "access": "public",
