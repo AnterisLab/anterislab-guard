@@ -1,4 +1,3 @@
-
 name: CI
 
 on:
@@ -44,8 +43,8 @@ jobs:
           cache: 'npm'
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
-      
-audit:
+
+  audit:
     name: Audit
     runs-on: ubuntu-latest
     steps:
@@ -57,7 +56,7 @@ audit:
       - run: npm ci --no-audit --no-fund
       - name: npm audit (high and critical)
         run: npm audit --audit-level=high
-        
+
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
