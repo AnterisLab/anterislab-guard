@@ -19,6 +19,27 @@ active AnterisLab subscription to function. A 14-day free tier is available for 
 The policy engine and kill switch run in the AnterisLab cloud. This SDK provides the client side:
 enforcement, transport, verdict verification, and kill switch coordination.
 
+## Try it without a subscription
+
+The fastest way to see the SDK in action is the public sandbox. No signup, no
+API key, no credit card:
+
+```js
+import { Guard, GuardBlockedError } from '@anterislab/guard';
+
+const guard = new Guard({ apiKey: 'anteris_sandbox_public' });
+
+try {
+  await guard.decide(
+    { type: 'payment', amount: 250, currency: 'EUR' },
+    'billing-bot',
+  );
+} catch (error) {
+  if (error instanceof GuardBlockedError) {
+    console.log('blocked:', error.message);   // sandbox policy: amount > 100
+  }
+}
+
 ## Installation
 
 ```bash
