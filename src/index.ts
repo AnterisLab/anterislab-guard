@@ -35,7 +35,11 @@ import { Transport } from './transport.js';
 import { isAuthorizing, parseVerdict, type ParsedDecision } from './verdict.js';
 import { stripTrailingSlashes } from './shared/url.js';
 
-export const SDK_VERSION = '0.2.0';
+/**
+ * SDK version, sent in the `x-anterislab-sdk` header of every request.
+ * IMPORTANT: keep in sync with `package.json`'s `version` field.
+ */
+export const SDK_VERSION = '1.0.0';
 
 /** Default allowed hosts: the key never travels to an arbitrary host. */
 export const DEFAULT_ALLOWED_HOSTS: readonly string[] = ['www.anterislab.com', 'anterislab.com'];
