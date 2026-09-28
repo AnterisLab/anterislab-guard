@@ -18,6 +18,76 @@ deterministic, and contains no production logic.
 The SDK's own test suite uses the same public mock. If the mock were not good
 enough for our tests, it would not be good enough for yours.
 
+## Try it in 30 seconds (no signup)
+
+If you want to test against the real control plane before committing to a
+subscription, use the public sandbox key:
+
+```js
+import { Guard, GuardBlockedError } from '@anterislab/guard';
+
+const guard = new Guard({ apiKey: 'anteris_sandbox_public' });
+
+try {
+  await guard.decide(
+    { type: 'payment', amount: 250, currency: 'EUR' },
+    'billing-bot',
+  );
+} catch (error) {
+  if (error instanceof GuardBlockedError) {
+    console.log('blocked:', error.message);
+  }
+}
+```
+
+The sandbox is a **real** evaluation against a **small set of demonstration
+policies**. It is not a mock: the SDK sends a real HTTP request, receives a
+real verdict, and applies all the usual safeguards (fail-closed posture, verdict
+parsing, signature handling if configured).
+
+What the sandbox does:
+
+- Returns `APPROVED` for anything that matches no rule.
+- Returns `BLOCKED` for `amount > 100` on any action that carries a numeric
+  `amount` in its context.
+- Returns `PAUSED` for a `domain` in `['unknown.example', 'suspicious.tld',
+  'malware.test']`.
+- Rate-limits at **20 evaluations per minute per IP**.
+
+What the sandbox does **not** do:
+
+- It does not touch a database, a tenant, or a quota.
+- It does not consume plan limits.
+- It does not store anything. Nothing you send to the sandbox is persisted.
+- It does not sign verdicts. Do not configure `verifyVerdict` when pointing at
+  the sandbox.
+
+Try all three outcomes with `curl`:
+
+```bash
+# APPROVED
+curl -X POST https://www.anterislab.com/api/v1/evaluate \
+  -H "Authorization: Bearer anteris_sandbox_public" \
+  -H "content-type: application/json" \
+  -d '{"agent":"test-bot","action":"read.data"}'
+
+# BLOCKED (amount > 100)
+curl -X POST https://www.anterislab.com/api/v1/evaluate \
+  -H "Authorization: Bearer anteris_sandbox_public" \
+  -H "content-type: application/json" \
+  -d '{"agent":"billing-bot","action":{"type":"payment","amount":250}}'
+
+# PAUSED (risky domain)
+curl -X POST https://www.anterislab.com/api/v1/evaluate \
+  -H "Authorization: Bearer anteris_sandbox_public" \
+  -H "content-type: application/json" \
+  -d '{"agent":"net-bot","action":"fetch","context":{"domain":"unknown.example"}}'
+```
+
+The sandbox is designed to be safe by construction: the key is public, the
+engine is hardcoded, the rate limit is per IP, and the branch does not open a
+connection to the production database. It is a teaching tool, not a production
+gateway.
 ## Basic setup
 
 ```js
