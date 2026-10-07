@@ -1,4 +1,3 @@
-
 # @anterislab/guard
 
 [![CI](https://github.com/AnterisLab/anterislab-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/AnterisLab/anterislab-guard/actions/workflows/ci.yml)
@@ -39,6 +38,7 @@ try {
     console.log('blocked:', error.message);   // sandbox policy: amount > 100
   }
 }
+```
 
 ## Installation
 
@@ -182,10 +182,10 @@ contains no production logic.
 Full documentation lives in [`docs/`](docs/README.md):
 
 - **[Quick start](docs/quick-start.md)** — install and run your first guarded action.
-- **[Configuration](docs/configuration.md)** — every option `new Guard(...)` to accepts.
-- **[Verdict reacts](docs/verdicts.
-.md)** —- what `APPROVED`, `FLAGGED`, `BLOCKED`, and `PAUSED` mean.
-- **[Error handling](docs/error-handling.md)** — the `GuardError` hierarchy and how **[Kill switch](docs/kill-switch.md)** — local halt, verified state, SSE stream.
+- **[Configuration](docs/configuration.md)** — every option `new Guard(...)` accepts.
+- **[Verdicts](docs/verdicts.md)** — what `APPROVED`, `FLAGGED`, `BLOCKED`, and `PAUSED` mean.
+- **[Error handling](docs/error-handling.md)** — the `GuardError` hierarchy and how to react to each.
+- **[Kill switch](docs/kill-switch.md)** — local halt, verified state, SSE stream.
 - **[Testing](docs/testing.md)** — the public mock, and testing without a subscription.
 - **[Subscription](docs/subscription.md)** — free tier, expiry, and upgrading.
 - **[Security model](docs/security-model.md)** — what the SDK protects against, and what it does not.
