@@ -160,7 +160,7 @@ pausedVerdict('manual review');       // { decision: 'PAUSED', ... }
 Each accepts an optional `extra` object that is merged into the body:
 
 ```js
-approvedVerdict('billing-bot', { latency_ms: 42, decision_id: 'd-42' });
+approvedVerdict('billing-bot', { latency_ms: 8, decision_id: 'd-8' });
 ```
 
 ## Responder forms
