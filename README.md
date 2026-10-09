@@ -17,6 +17,13 @@ Warm-path PDP decision <15ms p95 (no LLM, no network, no PSP). Repro: `npm run b
 AnterisLab Guard is the open-source client SDK for the AnterisLab policy engine. It requires an
 active AnterisLab subscription to function. A 14-day free tier is available for evaluation.
 
+Billing in short: trial = 14 days, 500 evaluations/month, 1 agent, kill switch
+excluded (paid-only). When the trial ends or quota runs out, the control plane
+returns `402` (`GuardQuotaError`) — terminal, `failOpen` does not bypass it.
+Free forever, no subscription: the public sandbox below and the `/mock` for tests.
+Exact plan numbers: <https://anterislab.com/pricing>. Full details:
+[docs/subscription.md](docs/subscription.md).
+
 The policy engine and kill switch run in the AnterisLab cloud. This SDK provides the client side:
 enforcement, transport, verdict verification, and kill switch coordination.
 
@@ -42,6 +49,31 @@ try {
 }
 ```
 
+> Sandbox vs production: the sandbox runs a fixed demo policy (`amount > 100`
+> is blocked). In production your own policies decide — sandbox behavior never
+> reflects your real rules.
+
+## Architecture
+
+```text
+[agent code] -- action --> [Guard SDK: enforces locally, fail-closed]
+                                  |
+                     verdict request (+ Idempotency-Key)
+                                  v
+              [AnterisLab cloud PDP: deterministic policy decision]
+                                  |
+                        signed verdict (HMAC, optional)
+                                  v
+              [PEP: revalidates everything, then calls PSP]
+                                  |
+                           [Stripe / Adyen]
+
+[kill switch] -- halt --> stops NOW, no round-trip (local + SSE stream)
+```
+
+Decisions are made in the cloud, enforcement happens locally: if the cloud is
+unreachable the SDK fails closed (blocks), and the local kill switch still works.
+
 ## Installation
 
 ```bash
@@ -49,6 +81,9 @@ npm install @anterislab/guard
 ```
 
 ## Minimal usage
+
+> Rule of thumb: guarding one function → `wrapFn` (below). Guarding a whole
+> object → `wrap()` (next section).
 
 ```js
 import { Guard, GuardBlockedError } from '@anterislab/guard';
