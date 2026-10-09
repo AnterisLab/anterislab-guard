@@ -10,6 +10,8 @@ stop order actually stops the agent.
 
 Zero runtime dependencies. Node 20+.
 
+Warm-path PDP decision <15ms p95 (no LLM, no network, no PSP). Repro: `npm run bench` → `bench/bench-pdp.mjs`.
+
 ## Requirements
 
 AnterisLab Guard is the open-source client SDK for the AnterisLab policy engine. It requires an
@@ -176,6 +178,15 @@ contains no production logic.
 5. `402`, `401`, `403`, `409` are terminal: never retried.
 6. The API key never appears in URLs, bodies, or logs.
 7. A halt arriving during evaluation still stops the action (anti-TOCTOU).
+
+## Performance
+
+Warm-path PDP decision <15ms p95 — deterministic evaluation only, no LLM in loop, no network, no PSP call. Cold-start and PSP latency excluded.
+
+```bash
+npm run bench
+# runs bench/bench-pdp.mjs (2000 decisions, asserts p95 < 15ms)
+```
 
 ## Documentation
 
