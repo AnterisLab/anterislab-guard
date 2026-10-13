@@ -21,6 +21,13 @@ updates:
           - "eslint"
           - "@eslint/*"
           - "typescript-eslint"
+    # typescript-eslint still requires typescript <6.1.0 (TS7 is Go-native,
+    # no stable programmatic API until 7.1). Block TS>=7 so `npm ci` keeps
+    # passing; remove once typescript-eslint supports TS7.
+    # See: typescript-eslint#12518
+    ignore:
+      - dependency-name: "typescript"
+        versions: [">=7"]
 
   # GitHub Actions versions.
   - package-ecosystem: "github-actions"
