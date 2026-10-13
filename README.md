@@ -1,3 +1,5 @@
+<a href="https://www.producthunt.com/products/anterislab-guard?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-anterislab-guard" target="_blank" rel="noopener noreferrer"><img alt="AnterisLab Guard - Secure payments for AI agents in <15ms | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1274844&theme=light&t=1791873294442"></a>
+
 # @anterislab/guard
 
 [![CI](https://github.com/AnterisLab/anterislab-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/AnterisLab/anterislab-guard/actions/workflows/ci.yml)
